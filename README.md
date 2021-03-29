@@ -39,13 +39,13 @@ public class Client : BSSocket
         Connect(peerEndPoint);
     }
 
-	// For error logging
+    // For error logging
     protected override void Log(object obj)
     {
         Console.WriteLine(obj);
     }
 
-	// Called when a connection has been established with this IPEndPoint
+    // Called when a connection has been established with this IPEndPoint
     protected override void OnConnect(IPEndPoint endPoint)
     {
         Log($"{endPoint.ToString()} connected");
@@ -57,13 +57,13 @@ public class Client : BSSocket
         });
     }
 	
-	// Called when a connection has been lost with this IPEndPoint
+    // Called when a connection has been lost with this IPEndPoint
     protected override void OnDisconnect(IPEndPoint endPoint)
     {
         Log($"{endPoint.ToString()} disconnected");
     }
 	
-	// Called when we receive a message from this IPEndPoint
+    // Called when we receive a message from this IPEndPoint
     protected override void OnReceiveMessage(IPEndPoint endPoint, BSReader reader)
     {
         // Receive the message, "Hello network!", from the other end
@@ -81,6 +81,7 @@ They can also quantize floats, halfs, Vectors and Quaternions, to keep the bits 
 BSWriter writer = new BSWriter();
 
 // Create a new BoundedRange, with a minimum value of 0, a maximum of 1 and 0.01 in precision
+// This range will crunch a float into just 7 bits
 BoundedRange range = new BoundedRange(0, 1, 0.01f);
 
 // Write a couple of floats to the writer
@@ -89,8 +90,8 @@ writer.WriteFloat(0.55f, range);
 
 // Return the bytes in a packed array
 byte[] bytes = writer.ToArray();
-Console.WriteLine($"Total bits used: {writer.TotalBits}"); // Print total bits used
-Console.WriteLine($"Total length of byte array: {bytes.Length}"); // Print length of byte array
+Console.WriteLine($"Total bits used: {writer.TotalBits}"); // Prints 14
+Console.WriteLine($"Total length of byte array: {bytes.Length}"); // Prints 2
 
 // Create a new BSReader from the byte array
 BSReader reader = new BSReader(bytes);
@@ -98,5 +99,5 @@ BSReader reader = new BSReader(bytes);
 // Read the 2 floats
 float firstFloat = reader.ReadFloat(range);
 float secondFloat = reader.ReadFloat(range);
-Console.WriteLine($"Floats read: {firstFloat}, {secondFloat}");
+Console.WriteLine($"Floats read: {firstFloat}, {secondFloat}"); // Prints 0.23 and 0.55
 ```

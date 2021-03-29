@@ -40,7 +40,7 @@ namespace BSNet.Stream
         {
             get
             {
-                return BSUtility.BYTE_BITS * internalStream.Count + bitPos - BSUtility.BYTE_BITS;
+                return BSUtility.BYTE_BITS * internalStream.Count + bitPos - 1 - BSUtility.BYTE_BITS;
             }
         }
 
