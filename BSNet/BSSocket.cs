@@ -143,7 +143,12 @@ namespace BSNet
             }
 
             // Send a message with the generated token
-            byte[] rawBytes = SendRawMessage(endPoint, ConnectionType.CONNECT, connection.LocalToken);
+            byte[] rawBytes = SendRawMessage(endPoint, ConnectionType.CONNECT, connection.LocalToken, writer =>
+            {
+                int length = RECEIVE_BUFFER_SIZE * BSUtility.BYTE_BITS - writer.TotalBits;
+                byte[] padding = new byte[RECEIVE_BUFFER_SIZE];
+                writer.WriteBytes(length, padding);
+            });
             AddReliableMessage(endPoint, connection, rawBytes);
         }
 
@@ -332,31 +337,35 @@ namespace BSNet
                     // Check if a connection already exists
                     if (type == ConnectionType.CONNECT) // If this endPoint wants to establish connection
                     {
-                        if (connections.TryGetValue(endPoint, out ClientConnection connection))
+                        // Make sure this message has been padded
+                        if (length >= RECEIVE_BUFFER_SIZE)
                         {
-                            // Acknowledge this packet
-                            connection.Acknowledge(sequence);
-                        }
-                        else
-                        {
-                            // Add this connection to the list
-                            ulong localToken = Cryptography.GenerateToken();
-                            connection = new ClientConnection(ElapsedTime, localToken, token);
-                            connections.Add(endPoint, connection);
+                            if (connections.TryGetValue(endPoint, out ClientConnection connection))
+                            {
+                                // Acknowledge this packet
+                                connection.Acknowledge(sequence);
+                            }
+                            else
+                            {
+                                // Add this connection to the list
+                                ulong localToken = Cryptography.GenerateToken();
+                                connection = new ClientConnection(ElapsedTime, localToken, token);
+                                connections.Add(endPoint, connection);
 
-                            // Acknowledge this packet
-                            connection.Acknowledge(sequence);
+                                // Acknowledge this packet
+                                connection.Acknowledge(sequence);
 
-                            // Send a connection message to the sender
-                            byte[] bytes = SendRawMessage(endPoint, ConnectionType.CONNECT, connection.LocalToken);
-                            AddReliableMessage(endPoint, connection, bytes);
-                        }
+                                // Send a connection message to the sender
+                                byte[] bytes = SendRawMessage(endPoint, ConnectionType.CONNECT, connection.LocalToken);
+                                AddReliableMessage(endPoint, connection, bytes);
+                            }
 
-                        // If this connection is not authenticated
-                        if (!connection.Authenticated)
-                        {
-                            connection.Authenticate(token, ElapsedTime);
-                            OnConnect((IPEndPoint)endPoint);
+                            // If this connection is not authenticated
+                            if (!connection.Authenticated)
+                            {
+                                connection.Authenticate(token, ElapsedTime);
+                                OnConnect((IPEndPoint)endPoint);
+                            }
                         }
                     }
                     else if (connections.TryGetValue(endPoint, out ClientConnection connection))
@@ -428,7 +437,7 @@ namespace BSNet
                 connections.Remove(data.Key);
                 OnDisconnect((IPEndPoint)data.Key);
             }
-            
+
 
             // Resend lost reliable packets
             var resendMessages = unsentMessages.Where(i => i.Value.timeSent < resendTime).ToArray();
@@ -454,7 +463,7 @@ namespace BSNet
                     // Remove message and clear RTT
                     connection.ClearRTT(data.Key.sequence);
                     unsentMessages.Remove(data.Key);
-                    
+
                     // Increment sequence
                     connection.IncrementSequence();
                     connection.UpdateLastSent(ElapsedTime);
