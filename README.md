@@ -68,7 +68,7 @@ public class Client : BSSocket
     }
 	
     // Called when we receive a message from this IPEndPoint
-    protected override void OnReceiveMessage(IPEndPoint endPoint, BSReader reader)
+    protected override void OnReceiveMessage(IPEndPoint endPoint, IBSStream reader)
     {
         // Receive the message, "Hello network!", from the other end
         string message = reader.ReadString(encoding);
@@ -80,7 +80,7 @@ public class Client : BSSocket
 ## Bitpacking
 The readers and writers have built-in functionality for packing bits as tight as you want.
 They can also quantize floats, halfs, Vectors and Quaternions, to keep the bits low.
-````csharp
+```csharp
 // Create a new BSWriter
 BSWriter writer = new BSWriter();
 
