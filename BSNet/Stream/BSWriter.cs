@@ -1,26 +1,4 @@
-﻿/*
- * The MIT License (MIT)
- * Copyright (c) 2015-2017 Bui
- * 
- * Permission is hereby granted, free of charge, to any person obtaining a copy of
- * this software and associated documentation files (the "Software"), to deal in
- * the Software without restriction, including without limitation the rights to
- * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
- * the Software, and to permit persons to whom the Software is furnished to do so,
- * subject to the following conditions:
- * 
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- * 
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
- * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
- * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
- * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
- * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- */
-
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Text;
@@ -34,13 +12,16 @@ using UnityEngine;
 
 namespace BSNet.Stream
 {
-    public class BSWriter
+    public class BSWriter : IBSStream
     {
+        public bool Writing { get { return true; } }
+        public bool Reading { get { return false; } }
+
         public int TotalBits
         {
             get
             {
-                return BSUtility.BYTE_BITS * internalStream.Count + bitPos - 1 - BSUtility.BYTE_BITS;
+                return BSUtility.BYTE_BITS * internalStream.Count + bitPos - BSUtility.BYTE_BITS;
             }
         }
 
@@ -50,30 +31,31 @@ namespace BSNet.Stream
 
 
         // Unsigned
-        public void WriteByte(byte value, int bitCount = sizeof(byte) * BSUtility.BYTE_BITS)
+        public bool SerializeByte(ref byte value, int bitCount = sizeof(byte) * BSUtility.BYTE_BITS)
         {
-            WriteBytes(bitCount, new byte[] { value });
+            byte[] bytes = new byte[] { value };
+            return SerializeBytes(ref bytes, bitCount);
         }
 
-        public void WriteUShort(ushort value, int bitCount = sizeof(ushort) * BSUtility.BYTE_BITS)
+        public bool SerializeUShort(ref ushort value, int bitCount = sizeof(ushort) * BSUtility.BYTE_BITS)
         {
             byte[] bytes = new byte[2];
             bytes[0] = (byte)(value >> 8);
             bytes[1] = (byte)value;
-            WriteBytes(bitCount, bytes);
+            return SerializeBytes(ref bytes, bitCount);
         }
 
-        public void WriteUInt(uint value, int bitCount = sizeof(uint) * BSUtility.BYTE_BITS)
+        public bool SerializeUInt(ref uint value, int bitCount = sizeof(uint) * BSUtility.BYTE_BITS)
         {
             byte[] bytes = new byte[4];
             bytes[0] = (byte)(value >> 24);
             bytes[1] = (byte)(value >> 16);
             bytes[2] = (byte)(value >> 8);
             bytes[3] = (byte)value;
-            WriteBytes(bitCount, bytes);
+            return SerializeBytes(ref bytes, bitCount);
         }
 
-        public void WriteULong(ulong value, int bitCount = sizeof(ulong) * BSUtility.BYTE_BITS)
+        public bool SerializeULong(ref ulong value, int bitCount = sizeof(ulong) * BSUtility.BYTE_BITS)
         {
             byte[] bytes = new byte[8];
             bytes[0] = (byte)(value >> 56);
@@ -84,119 +66,162 @@ namespace BSNet.Stream
             bytes[5] = (byte)(value >> 16);
             bytes[6] = (byte)(value >> 8);
             bytes[7] = (byte)value;
-            WriteBytes(bitCount, bytes);
+            return SerializeBytes(ref bytes, bitCount);
         }
 
         // Signed
-        public void WriteSByte(sbyte value, int bitCount = sizeof(sbyte) * BSUtility.BYTE_BITS)
+        public bool SerializeSByte(ref sbyte value, int bitCount = sizeof(sbyte) * BSUtility.BYTE_BITS)
         {
             byte zigzag = (byte)((value << 1) ^ (value >> 7));
-            WriteByte(zigzag, bitCount);
+            return SerializeByte(ref zigzag, bitCount);
         }
 
-        public void WriteShort(short value, int bitCount = sizeof(short) * BSUtility.BYTE_BITS)
+        public bool SerializeShort(ref short value, int bitCount = sizeof(short) * BSUtility.BYTE_BITS)
         {
             ushort zigzag = (ushort)((value << 1) ^ (value >> 15));
-            WriteUShort(zigzag, bitCount);
+            return SerializeUShort(ref zigzag, bitCount);
         }
 
-        public void WriteInt(int value, int bitCount = sizeof(int) * BSUtility.BYTE_BITS)
+        public bool SerializeInt(ref int value, int bitCount = sizeof(int) * BSUtility.BYTE_BITS)
         {
             uint zigzag = (uint)((value << 1) ^ (value >> 31));
-            WriteUInt(zigzag, bitCount);
+            return SerializeUInt(ref zigzag, bitCount);
         }
 
-        public void WriteLong(long value, int bitCount = sizeof(long) * BSUtility.BYTE_BITS)
+        public bool SerializeLong(ref long value, int bitCount = sizeof(long) * BSUtility.BYTE_BITS)
         {
             ulong zigzag = (ulong)((value << 1) ^ (value >> 63));
-            WriteULong(zigzag, bitCount);
+            return SerializeULong(ref zigzag, bitCount);
         }
 
         // Floating point
-        public void WriteFloat(float value, BoundedRange range)
+        public bool SerializeFloat(ref float value, BoundedRange range)
         {
             uint quanValue = range.Quantize(value);
 
-            WriteUInt(quanValue, range.BitsRequired);
+            return SerializeUInt(ref quanValue, range.BitsRequired);
         }
 
-        public void WriteHalf(float value)
+        public bool SerializeHalf(ref float value)
         {
             ushort half = HalfPrecision.Quantize(value);
 
-            WriteUShort(half);
+            return SerializeUShort(ref half);
         }
 
         // Vectors & Quaternions
-        public void WriteVector2(Vector2 vec, BoundedRange[] range)
+        public bool SerializeVector2(ref Vector2 vec, BoundedRange[] range)
         {
             QuantizedVector2 quanVec = BoundedRange.Quantize(vec, range);
 
-            WriteUInt(quanVec.x, range[0].BitsRequired);
-            WriteUInt(quanVec.y, range[1].BitsRequired);
+            if (!SerializeUInt(ref quanVec.x, range[0].BitsRequired))
+                return false;
+
+            if (!SerializeUInt(ref quanVec.y, range[1].BitsRequired))
+                return false;
+
+            return true;
         }
 
-        public void WriteVector3(Vector3 vec, BoundedRange[] range)
+        public bool SerializeVector3(ref Vector3 vec, BoundedRange[] range)
         {
             QuantizedVector3 quanVec = BoundedRange.Quantize(vec, range);
 
-            WriteUInt(quanVec.x, range[0].BitsRequired);
-            WriteUInt(quanVec.y, range[1].BitsRequired);
-            WriteUInt(quanVec.z, range[2].BitsRequired);
+            if (!SerializeUInt(ref quanVec.x, range[0].BitsRequired))
+                return false;
+
+            if (!SerializeUInt(ref quanVec.y, range[1].BitsRequired))
+                return false;
+
+            if (!SerializeUInt(ref quanVec.z, range[2].BitsRequired))
+                return false;
+
+            return true;
         }
 
-        public void WriteVector4(Vector4 vec, BoundedRange[] range)
+        public bool SerializeVector4(ref Vector4 vec, BoundedRange[] range)
         {
             QuantizedVector4 quanVec = BoundedRange.Quantize(vec, range);
 
-            WriteUInt(quanVec.x, range[0].BitsRequired);
-            WriteUInt(quanVec.y, range[1].BitsRequired);
-            WriteUInt(quanVec.z, range[2].BitsRequired);
-            WriteUInt(quanVec.w, range[3].BitsRequired);
+            if (!SerializeUInt(ref quanVec.x, range[0].BitsRequired))
+                return false;
+            if (!SerializeUInt(ref quanVec.y, range[1].BitsRequired))
+                return false;
+            if (!SerializeUInt(ref quanVec.z, range[2].BitsRequired))
+                return false;
+            if (!SerializeUInt(ref quanVec.w, range[3].BitsRequired))
+                return false;
+
+            return true;
         }
 
-        public void WriteQuaternion(Quaternion quat, int bitsPerElement = 12)
+        public bool SerializeQuaternion(ref Quaternion quat, int bitsPerElement = 12)
         {
             QuantizedQuaternion quanQuat = SmallestThree.Quantize(quat, bitsPerElement);
 
-            WriteUInt(quanQuat.m, 2);
-            WriteUInt(quanQuat.a, bitsPerElement);
-            WriteUInt(quanQuat.b, bitsPerElement);
-            WriteUInt(quanQuat.c, bitsPerElement);
+            if (!SerializeUInt(ref quanQuat.m, 2))
+                return false;
+            if (!SerializeUInt(ref quanQuat.a, bitsPerElement))
+                return false;
+            if (!SerializeUInt(ref quanQuat.b, bitsPerElement))
+                return false;
+            if (!SerializeUInt(ref quanQuat.c, bitsPerElement))
+                return false;
+
+            return true;
         }
 
         // String
-        public void WriteString(string value, Encoding encoding)
+        public bool SerializeString(ref string value, Encoding encoding)
         {
             if (value.Equals(null)) throw new ArgumentNullException(nameof(value));
             if (encoding.Equals(null)) throw new ArgumentNullException(nameof(encoding));
+
             byte[] bytes = encoding.GetBytes(value);
-            WriteInt(bytes.Length);
+            int length = bytes.Length;
+            if (!SerializeInt(ref length))
+                return false;
+
             if (bytes.Length > 0)
-                WriteBytes(bytes.Length * BSUtility.BYTE_BITS, bytes);
+            {
+                if (!SerializeBytes(ref bytes, bytes.Length * BSUtility.BYTE_BITS))
+                    return false;
+            }
+
+            return true;
         }
 
         // IPs
-        public void WriteIPAddress(IPAddress ipAddress)
+        public bool SerializeIPAddress(ref IPAddress ipAddress)
         {
-            WriteBytes(4 * BSUtility.BYTE_BITS, ipAddress.GetAddressBytes());
+            byte[] bytes = ipAddress.GetAddressBytes();
+            return SerializeBytes(ref bytes, 4 * BSUtility.BYTE_BITS);
         }
 
-        public void WriteIPEndPoint(IPEndPoint endPoint)
+        public bool SerializeIPEndPoint(ref IPEndPoint endPoint)
         {
-            WriteIPAddress(endPoint.Address);
-            WriteUShort((ushort)endPoint.Port);
+            IPAddress ipAddress = endPoint.Address;
+            if (!SerializeIPAddress(ref ipAddress))
+                return false;
+
+            ushort port = (ushort)endPoint.Port;
+            if (!SerializeUShort(ref port))
+                return false;
+
+            return true;
         }
 
-
-        public byte[] ToArray() => internalStream.ToArray();
-
-        public void WriteBytes(int bitCount, byte[] data)
+        // Bytes
+        public bool SerializeBytes(ref byte[] data, int bitCount)
         {
             byte[] raw = new byte[data.Length];
             Buffer.BlockCopy(data, 0, raw, 0, data.Length);
             Write(bitCount, raw, 0, raw.Length);
+            return true;
         }
+
+
+        public byte[] ToArray() => internalStream.ToArray();
 
         private int ExpandBuffer(int bitCount)
         {

@@ -61,6 +61,12 @@ namespace BSNet
             }
         }
 
+        public void AddRTT(ushort sequence, double time)
+        {
+            if (!roundTrips.ContainsKey(sequence))
+                roundTrips.Add(sequence, time);
+        }
+
         public void UpdateRTT(ushort sequence, double time)
         {
             if (roundTrips.TryGetValue(sequence, out double sent))
@@ -69,10 +75,6 @@ namespace BSNet
                 roundTrips.Remove(sequence);
 
                 RTT = RTT * 0.9d + rtt * 0.1d;
-            }
-            else
-            {
-                roundTrips.Add(sequence, time);
             }
         }
 

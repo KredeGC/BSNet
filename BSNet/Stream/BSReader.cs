@@ -1,26 +1,4 @@
-﻿/*
- * The MIT License (MIT)
- * Copyright (c) 2015-2017 Bui
- * 
- * Permission is hereby granted, free of charge, to any person obtaining a copy of
- * this software and associated documentation files (the "Software"), to deal in
- * the Software without restriction, including without limitation the rights to
- * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
- * the Software, and to permit persons to whom the Software is furnished to do so,
- * subject to the following conditions:
- * 
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- * 
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
- * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
- * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
- * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
- * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- */
-
-using System;
+﻿using System;
 using System.Net;
 using System.Text;
 using BSNet.Quantization;
@@ -33,16 +11,19 @@ using UnityEngine;
 
 namespace BSNet.Stream
 {
-    public class BSReader
+    public class BSReader : IBSStream
     {
+        public bool Writing { get { return false; } }
+        public bool Reading { get { return true; } }
+
         public bool IsFinished
         {
             get
             {
-                return RemainingBits == 0;
+                return TotalBits == 0;
             }
         }
-        public int RemainingBits
+        public int TotalBits
         {
             get
             {
@@ -64,154 +45,252 @@ namespace BSNet.Stream
 
 
         // Unsigned
-        public byte ReadByte(int bitCount = sizeof(byte) * BSUtility.BYTE_BITS)
+        public bool SerializeByte(ref byte value, int bitCount = sizeof(byte) * BSUtility.BYTE_BITS)
         {
-            return ReadBytes(bitCount)[0];
+            byte[] bytes = null;
+            if (!SerializeBytes(ref bytes, bitCount))
+                return false;
+
+            value = bytes[0];
+            return true;
         }
 
-        public ushort ReadUShort(int bitCount = sizeof(ushort) * BSUtility.BYTE_BITS)
+        public bool SerializeUShort(ref ushort value, int bitCount = sizeof(ushort) * BSUtility.BYTE_BITS)
         {
-            return (ushort)ReadULong(bitCount);
+            ulong lValue = 0;
+            if (!SerializeULong(ref lValue, bitCount))
+                return false;
+
+            value = (ushort)lValue;
+            return true;
         }
 
-        public uint ReadUInt(int bitCount = sizeof(uint) * BSUtility.BYTE_BITS)
+        public bool SerializeUInt(ref uint value, int bitCount = sizeof(uint) * BSUtility.BYTE_BITS)
         {
-            return (uint)ReadULong(bitCount);
+            ulong lValue = 0;
+            if (!SerializeULong(ref lValue, bitCount))
+                return false;
+
+            value = (uint)lValue;
+            return true;
         }
 
-        public ulong ReadULong(int bitCount = sizeof(ulong) * BSUtility.BYTE_BITS)
+        public bool SerializeULong(ref ulong value, int bitCount = sizeof(ulong) * BSUtility.BYTE_BITS)
         {
-            byte[] bytes = ReadBytes(bitCount);
-            ulong val = 0;
+            byte[] bytes = null;
+            if (!SerializeBytes(ref bytes, bitCount))
+                return false;
+
+            value = 0;
             int shift = (bytes.Length - 1) * 8;
             for (int i = 0; i < bytes.Length; i++, shift -= 8)
-                val |= (ulong)bytes[i] << shift;
-            return val;
+                value |= (ulong)bytes[i] << shift;
+
+            return true;
         }
 
         // Signed
-        public short ReadShort(int bitCount = sizeof(short) * BSUtility.BYTE_BITS)
+        public bool SerializeSByte(ref sbyte value, int bitCount = sizeof(sbyte) * BSUtility.BYTE_BITS)
         {
-            ushort value = ReadUShort(bitCount);
-            short zagzig = (short)((value >> 1) ^ (-(short)(value & 1)));
+            byte uValue = 0;
+            if (!SerializeByte(ref uValue, bitCount))
+                return false;
 
-            return zagzig;
+            value = (sbyte)((uValue >> 1) ^ (-(sbyte)(uValue & 1)));
+            return true;
         }
 
-        public int ReadInt(int bitCount = sizeof(int) * BSUtility.BYTE_BITS)
+        public bool SerializeShort(ref short value, int bitCount = sizeof(short) * BSUtility.BYTE_BITS)
         {
-            uint value = ReadUInt(bitCount);
-            int zagzig = (int)((value >> 1) ^ (-(int)(value & 1)));
+            ushort uValue = 0;
+            if (!SerializeUShort(ref uValue, bitCount))
+                return false;
 
-            return zagzig;
+            value = (short)((uValue >> 1) ^ (-(short)(uValue & 1)));
+            return true;
         }
 
-        public long ReadLong(int bitCount = sizeof(long) * BSUtility.BYTE_BITS)
+        public bool SerializeInt(ref int value, int bitCount = sizeof(int) * BSUtility.BYTE_BITS)
         {
-            ulong value = ReadULong(bitCount);
-            long zagzig = (long)(value >> 1) ^ (-(long)(value & 1));
+            uint uValue = 0;
+            if (!SerializeUInt(ref uValue, bitCount))
+                return false;
 
-            return zagzig;
+            value = (int)((uValue >> 1) ^ (-(int)(uValue & 1)));
+            return true;
+        }
+
+        public bool SerializeLong(ref long value, int bitCount = sizeof(long) * BSUtility.BYTE_BITS)
+        {
+            ulong uValue = 0;
+            if (!SerializeULong(ref uValue, bitCount))
+                return false;
+
+            value = (long)(uValue >> 1) ^ (-(long)(uValue & 1));
+            return true;
         }
 
         // Floating point
-        public float ReadFloat(BoundedRange range)
+        public bool SerializeFloat(ref float value, BoundedRange range)
         {
-            uint quanValue = ReadUInt(range.BitsRequired);
+            uint quanValue = 0;
+            if (!SerializeUInt(ref quanValue, range.BitsRequired))
+                return false;
 
-            return range.Dequantize(quanValue);
+            value = range.Dequantize(quanValue);
+            return true;
         }
 
-        public float ReadHalf()
+        public bool SerializeHalf(ref float value)
         {
-            ushort quanValue = ReadUShort();
+            ushort quanValue = 0;
+            if (!SerializeUShort(ref quanValue))
+                return false;
 
-            return HalfPrecision.Dequantize(quanValue);
+            value = HalfPrecision.Dequantize(quanValue);
+            return true;
         }
 
         // Vectors & Quaternions
-        public Vector2 ReadVector2(BoundedRange[] range)
+        public bool SerializeVector2(ref Vector2 value, BoundedRange[] range)
         {
-            float x = ReadFloat(range[0]);
-            float y = ReadFloat(range[1]);
+            float x = 0;
+            if (SerializeFloat(ref x, range[0]))
+                return false;
 
-            return new Vector2(x, y);
+            float y = 0;
+            if (SerializeFloat(ref y, range[1]))
+                return false;
+
+            value = new Vector2(x, y);
+            return true;
         }
 
-        public Vector3 ReadVector3(BoundedRange[] range)
+        public bool SerializeVector3(ref Vector3 value, BoundedRange[] range)
         {
-            float x = ReadFloat(range[0]);
-            float y = ReadFloat(range[1]);
-            float z = ReadFloat(range[2]);
+            float x = 0;
+            if (SerializeFloat(ref x, range[0]))
+                return false;
 
-            return new Vector3(x, y, z);
+            float y = 0;
+            if (SerializeFloat(ref y, range[1]))
+                return false;
+
+            float z = 0;
+            if (SerializeFloat(ref z, range[2]))
+                return false;
+
+            value = new Vector3(x, y, z);
+            return true;
         }
 
-        public Vector4 ReadVector4(BoundedRange[] range)
+        public bool SerializeVector4(ref Vector4 value, BoundedRange[] range)
         {
-            float x = ReadFloat(range[0]);
-            float y = ReadFloat(range[1]);
-            float z = ReadFloat(range[2]);
-            float w = ReadFloat(range[3]);
+            float x = 0;
+            if (SerializeFloat(ref x, range[0]))
+                return false;
 
-            return new Vector4(x, y, z, w);
+            float y = 0;
+            if (SerializeFloat(ref y, range[1]))
+                return false;
+
+            float z = 0;
+            if (SerializeFloat(ref z, range[2]))
+                return false;
+
+            float w = 0;
+            if (SerializeFloat(ref w, range[3]))
+                return false;
+
+            value = new Vector4(x, y, z, w);
+            return true;
         }
 
-        public Quaternion ReadQuaternion(int bitsPerElement = 12)
+        public bool SerializeQuaternion(ref Quaternion value, int bitsPerElement = 12)
         {
-            uint m = ReadUInt(2);
-            uint a = ReadUInt(bitsPerElement);
-            uint b = ReadUInt(bitsPerElement);
-            uint c = ReadUInt(bitsPerElement);
+            uint m = 0;
+            if (!SerializeUInt(ref m, 2))
+                return false;
+
+            uint a = 0;
+            if (!SerializeUInt(ref a, bitsPerElement))
+                return false;
+
+            uint b = 0;
+            if (!SerializeUInt(ref b, bitsPerElement))
+                return false;
+
+            uint c = 0;
+            if (!SerializeUInt(ref c, bitsPerElement))
+                return false;
 
             QuantizedQuaternion quanQuat = new QuantizedQuaternion(m, a, b, c);
 
-            return SmallestThree.Dequantize(quanQuat, bitsPerElement);
+            value = SmallestThree.Dequantize(quanQuat, bitsPerElement);
+
+            return true;
         }
 
         // String
-        public string ReadString(Encoding encoding)
+        public bool SerializeString(ref string value, Encoding encoding)
         {
             if (encoding.Equals(null)) throw new ArgumentNullException(nameof(encoding));
 
-            int length = ReadInt();
-            if (length == 0)
-                return string.Empty;
+            int length = 0;
+            if (!SerializeInt(ref length))
+                return false;
 
-            byte[] bytes = ReadBytes(length * BSUtility.BYTE_BITS);
-            return encoding.GetString(bytes);
+            if (length == 0)
+            {
+                value = string.Empty;
+            }
+            else
+            {
+                byte[] bytes = null;
+                if (!SerializeBytes(ref bytes, length * BSUtility.BYTE_BITS))
+                    return false;
+                value = encoding.GetString(bytes);
+            }
+            return true;
         }
 
         // IPs
-        public IPAddress ReadIPAddress()
+        public bool SerializeIPAddress(ref IPAddress ipAddress)
         {
-            byte[] addressBytes = ReadBytes(4 * BSUtility.BYTE_BITS);
-
-            return new IPAddress(addressBytes);
-        }
-
-        public IPEndPoint ReadIPEndPoint()
-        {
-            IPAddress ipAddress = ReadIPAddress();
-            ushort port = ReadUShort();
-
-            return new IPEndPoint(ipAddress, port);
-        }
-
-
-        public byte[] ReadBytes(int bitCount)
-        {
-            Read(bitCount, out byte[] data, (int)Math.Ceiling((double)bitCount / BSUtility.BYTE_BITS));
-            return data;
-        }
-
-        private bool Read(int bitCount, out byte[] data, int typeBytes)
-        {
-            if (bitCount > RemainingBits)
-            {
-                data = null;
+            byte[] addressBytes = null;
+            if (!SerializeBytes(ref addressBytes, 4 * BSUtility.BYTE_BITS))
                 return false;
-            }
+
+            ipAddress = new IPAddress(addressBytes);
+            return true;
+        }
+
+        public bool SerializeIPEndPoint(ref IPEndPoint endPoint)
+        {
+            IPAddress ipAddress = null;
+            if (!SerializeIPAddress(ref ipAddress))
+                return false;
+
+            ushort port = 0;
+            if (!SerializeUShort(ref port))
+                return false;
+            
+            endPoint.Address = ipAddress;
+            endPoint.Port = port;
+            return true;
+        }
+
+        // Bytes
+        public bool SerializeBytes(ref byte[] bytes, int bitCount)
+        {
+            return Read(bitCount, ref bytes, (int)Math.Ceiling((double)bitCount / BSUtility.BYTE_BITS));
+        }
+
+
+        private bool Read(int bitCount, ref byte[] data, int typeBytes)
+        {
+            if (bitCount > TotalBits)
+                return false;
 
             data = new byte[typeBytes];
 

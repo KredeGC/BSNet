@@ -55,6 +55,7 @@
     <Compile Include="Quantization\SmallestThree.cs" />
     <Compile Include="Stream\BSReader.cs" />
     <Compile Include="Stream\BSWriter.cs" />
+    <Compile Include="Stream\IBSStream.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />

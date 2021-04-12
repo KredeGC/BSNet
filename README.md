@@ -21,6 +21,10 @@ Should NOT be used with sensitive data as no encryption occurs, whatsoever.
 * Man in the middle attacks (Proper encryption would be needed for that).
 * Zombie clients.
 
+### Future ideas
+* CRC32 to protect against old clients and accidental connections.
+* Some sort of packet fragmentation.
+
 # Usage
 ## P2P example
 This is an example of a simple P2P architecture, where both ends connect to eachother and send a message when connected.
