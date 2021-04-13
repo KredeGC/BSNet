@@ -16,13 +16,6 @@ namespace BSNet.Stream
         public bool Writing { get { return false; } }
         public bool Reading { get { return true; } }
 
-        public bool IsFinished
-        {
-            get
-            {
-                return TotalBits == 0;
-            }
-        }
         public int TotalBits
         {
             get
@@ -44,253 +37,176 @@ namespace BSNet.Stream
         public BSReader(byte[] byteStream) : this(byteStream, byteStream.Length) { }
 
 
+        // Padding
+        public byte[] PadToEnd()
+        {
+            int remaining = BSSocket.RECEIVE_BUFFER_SIZE * BSUtility.BYTE_BITS - TotalBits;
+            byte[] padding = SerializeBytes(remaining);
+            return padding;
+        }
+
         // Unsigned
-        public bool SerializeByte(ref byte value, int bitCount = sizeof(byte) * BSUtility.BYTE_BITS)
+        public byte SerializeByte(byte value = default(byte), int bitCount = sizeof(byte) * BSUtility.BYTE_BITS)
         {
-            byte[] bytes = null;
-            if (!SerializeBytes(ref bytes, bitCount))
-                return false;
-
-            value = bytes[0];
-            return true;
+            byte[] bytes = SerializeBytes(bitCount);
+            return bytes[0];
         }
 
-        public bool SerializeUShort(ref ushort value, int bitCount = sizeof(ushort) * BSUtility.BYTE_BITS)
+        public ushort SerializeUShort(ushort value = default(ushort), int bitCount = sizeof(ushort) * BSUtility.BYTE_BITS)
         {
-            ulong lValue = 0;
-            if (!SerializeULong(ref lValue, bitCount))
-                return false;
-
-            value = (ushort)lValue;
-            return true;
+            ulong val = SerializeULong(value, bitCount);
+            return (ushort)val;
         }
 
-        public bool SerializeUInt(ref uint value, int bitCount = sizeof(uint) * BSUtility.BYTE_BITS)
+        public uint SerializeUInt(uint value = default(uint), int bitCount = sizeof(uint) * BSUtility.BYTE_BITS)
         {
-            ulong lValue = 0;
-            if (!SerializeULong(ref lValue, bitCount))
-                return false;
-
-            value = (uint)lValue;
-            return true;
+            ulong val = SerializeULong(value, bitCount);
+            return (uint)val;
         }
 
-        public bool SerializeULong(ref ulong value, int bitCount = sizeof(ulong) * BSUtility.BYTE_BITS)
+        public ulong SerializeULong(ulong value = default(ulong), int bitCount = sizeof(ulong) * BSUtility.BYTE_BITS)
         {
-            byte[] bytes = null;
-            if (!SerializeBytes(ref bytes, bitCount))
-                return false;
+            byte[] bytes = SerializeBytes(bitCount);
 
-            value = 0;
+            ulong val = 0;
             int shift = (bytes.Length - 1) * 8;
             for (int i = 0; i < bytes.Length; i++, shift -= 8)
-                value |= (ulong)bytes[i] << shift;
+                val |= (ulong)bytes[i] << shift;
 
-            return true;
+            return val;
         }
 
         // Signed
-        public bool SerializeSByte(ref sbyte value, int bitCount = sizeof(sbyte) * BSUtility.BYTE_BITS)
+        public sbyte SerializeSByte(sbyte value = default(sbyte), int bitCount = sizeof(sbyte) * BSUtility.BYTE_BITS)
         {
-            byte uValue = 0;
-            if (!SerializeByte(ref uValue, bitCount))
-                return false;
-
-            value = (sbyte)((uValue >> 1) ^ (-(sbyte)(uValue & 1)));
-            return true;
+            byte val = SerializeByte(0, bitCount);
+            sbyte zagzig = (sbyte)((val >> 1) ^ (-(sbyte)(val & 1)));
+            return zagzig;
         }
 
-        public bool SerializeShort(ref short value, int bitCount = sizeof(short) * BSUtility.BYTE_BITS)
+        public short SerializeShort(short value = default(short), int bitCount = sizeof(short) * BSUtility.BYTE_BITS)
         {
-            ushort uValue = 0;
-            if (!SerializeUShort(ref uValue, bitCount))
-                return false;
-
-            value = (short)((uValue >> 1) ^ (-(short)(uValue & 1)));
-            return true;
+            ushort val = SerializeUShort(0, bitCount);
+            short zagzig = (short)((val >> 1) ^ (-(short)(val & 1)));
+            return zagzig;
         }
 
-        public bool SerializeInt(ref int value, int bitCount = sizeof(int) * BSUtility.BYTE_BITS)
+        public int SerializeInt(int value = default(int), int bitCount = sizeof(int) * BSUtility.BYTE_BITS)
         {
-            uint uValue = 0;
-            if (!SerializeUInt(ref uValue, bitCount))
-                return false;
-
-            value = (int)((uValue >> 1) ^ (-(int)(uValue & 1)));
-            return true;
+            uint val = SerializeUInt(0, bitCount);
+            int zagzig = (int)((val >> 1) ^ (-(int)(val & 1)));
+            return zagzig;
         }
 
-        public bool SerializeLong(ref long value, int bitCount = sizeof(long) * BSUtility.BYTE_BITS)
+        public long SerializeLong(long value = default(long), int bitCount = sizeof(long) * BSUtility.BYTE_BITS)
         {
-            ulong uValue = 0;
-            if (!SerializeULong(ref uValue, bitCount))
-                return false;
-
-            value = (long)(uValue >> 1) ^ (-(long)(uValue & 1));
-            return true;
+            ulong val = SerializeULong(0, bitCount);
+            long zagzig = (long)(val >> 1) ^ (-(long)(val & 1));
+            return zagzig;
         }
 
         // Floating point
-        public bool SerializeFloat(ref float value, BoundedRange range)
+        public float SerializeFloat(BoundedRange range, float value = default(float))
         {
-            uint quanValue = 0;
-            if (!SerializeUInt(ref quanValue, range.BitsRequired))
-                return false;
+            uint quanValue = SerializeUInt(0, range.BitsRequired);
 
-            value = range.Dequantize(quanValue);
-            return true;
+            return range.Dequantize(quanValue);
         }
 
-        public bool SerializeHalf(ref float value)
+        public float SerializeHalf(float value = default(float))
         {
-            ushort quanValue = 0;
-            if (!SerializeUShort(ref quanValue))
-                return false;
+            ushort quanValue = SerializeUShort();
 
-            value = HalfPrecision.Dequantize(quanValue);
-            return true;
+            return HalfPrecision.Dequantize(quanValue);
         }
 
         // Vectors & Quaternions
-        public bool SerializeVector2(ref Vector2 value, BoundedRange[] range)
+        public Vector2 SerializeVector2(BoundedRange[] range, Vector2 value = default(Vector2))
         {
-            float x = 0;
-            if (SerializeFloat(ref x, range[0]))
-                return false;
+            float x = SerializeFloat(range[0]);
+            float y = SerializeFloat(range[1]);
 
-            float y = 0;
-            if (SerializeFloat(ref y, range[1]))
-                return false;
-
-            value = new Vector2(x, y);
-            return true;
+            return new Vector2(x, y);
         }
 
-        public bool SerializeVector3(ref Vector3 value, BoundedRange[] range)
+        public Vector3 SerializeVector3(BoundedRange[] range, Vector3 value = default(Vector3))
         {
-            float x = 0;
-            if (SerializeFloat(ref x, range[0]))
-                return false;
+            float x = SerializeFloat(range[0]);
+            float y = SerializeFloat(range[1]);
+            float z = SerializeFloat(range[2]);
 
-            float y = 0;
-            if (SerializeFloat(ref y, range[1]))
-                return false;
-
-            float z = 0;
-            if (SerializeFloat(ref z, range[2]))
-                return false;
-
-            value = new Vector3(x, y, z);
-            return true;
+            return new Vector3(x, y, z);
         }
 
-        public bool SerializeVector4(ref Vector4 value, BoundedRange[] range)
+        public Vector4 SerializeVector4(BoundedRange[] range, Vector4 value = default(Vector4))
         {
-            float x = 0;
-            if (SerializeFloat(ref x, range[0]))
-                return false;
+            float x = SerializeFloat(range[0]);
+            float y = SerializeFloat(range[1]);
+            float z = SerializeFloat(range[2]);
+            float w = SerializeFloat(range[3]);
 
-            float y = 0;
-            if (SerializeFloat(ref y, range[1]))
-                return false;
-
-            float z = 0;
-            if (SerializeFloat(ref z, range[2]))
-                return false;
-
-            float w = 0;
-            if (SerializeFloat(ref w, range[3]))
-                return false;
-
-            value = new Vector4(x, y, z, w);
-            return true;
+            return new Vector4(x, y, z, w);
         }
 
-        public bool SerializeQuaternion(ref Quaternion value, int bitsPerElement = 12)
+        public Quaternion SerializeQuaternion(int bitsPerElement = 12, Quaternion value = default(Quaternion))
         {
-            uint m = 0;
-            if (!SerializeUInt(ref m, 2))
-                return false;
-
-            uint a = 0;
-            if (!SerializeUInt(ref a, bitsPerElement))
-                return false;
-
-            uint b = 0;
-            if (!SerializeUInt(ref b, bitsPerElement))
-                return false;
-
-            uint c = 0;
-            if (!SerializeUInt(ref c, bitsPerElement))
-                return false;
+            uint m = SerializeUInt(0, 2);
+            uint a = SerializeUInt(0, bitsPerElement);
+            uint b = SerializeUInt(0, bitsPerElement);
+            uint c = SerializeUInt(0, bitsPerElement);
 
             QuantizedQuaternion quanQuat = new QuantizedQuaternion(m, a, b, c);
 
-            value = SmallestThree.Dequantize(quanQuat, bitsPerElement);
-
-            return true;
+            return SmallestThree.Dequantize(quanQuat, bitsPerElement);
         }
 
         // String
-        public bool SerializeString(ref string value, Encoding encoding)
+        public string SerializeString(Encoding encoding, string value = null)
         {
             if (encoding.Equals(null)) throw new ArgumentNullException(nameof(encoding));
 
-            int length = 0;
-            if (!SerializeInt(ref length))
-                return false;
+            int length = SerializeInt();
 
-            if (length == 0)
+            if (length > 0)
             {
-                value = string.Empty;
+                byte[] bytes = SerializeBytes(length * BSUtility.BYTE_BITS);
+                return encoding.GetString(bytes);
             }
-            else
-            {
-                byte[] bytes = null;
-                if (!SerializeBytes(ref bytes, length * BSUtility.BYTE_BITS))
-                    return false;
-                value = encoding.GetString(bytes);
-            }
-            return true;
+            return string.Empty;
         }
 
         // IPs
-        public bool SerializeIPAddress(ref IPAddress ipAddress)
+        public IPAddress SerializeIPAddress(IPAddress ipAddress)
         {
-            byte[] addressBytes = null;
-            if (!SerializeBytes(ref addressBytes, 4 * BSUtility.BYTE_BITS))
-                return false;
+            byte[] addressBytes = SerializeBytes(4 * BSUtility.BYTE_BITS);
 
-            ipAddress = new IPAddress(addressBytes);
-            return true;
+            return new IPAddress(addressBytes);
         }
 
-        public bool SerializeIPEndPoint(ref IPEndPoint endPoint)
+        public IPEndPoint SerializeIPEndPoint(IPEndPoint endPoint)
         {
-            IPAddress ipAddress = null;
-            if (!SerializeIPAddress(ref ipAddress))
-                return false;
+            IPAddress ipAddress = SerializeIPAddress(null);
 
-            ushort port = 0;
-            if (!SerializeUShort(ref port))
-                return false;
-            
-            endPoint.Address = ipAddress;
-            endPoint.Port = port;
-            return true;
+            ushort port = SerializeUShort();
+
+            return new IPEndPoint(ipAddress, port);
         }
 
         // Bytes
-        public bool SerializeBytes(ref byte[] bytes, int bitCount)
+        public byte[] SerializeBytes(int bitCount, byte[] data = null)
         {
-            return Read(bitCount, ref bytes, (int)Math.Ceiling((double)bitCount / BSUtility.BYTE_BITS));
+            Read(bitCount, out byte[] raw, (int)Math.Ceiling((double)bitCount / BSUtility.BYTE_BITS));
+            return raw;
         }
 
 
-        private bool Read(int bitCount, ref byte[] data, int typeBytes)
+        private bool Read(int bitCount, out byte[] data, int typeBytes)
         {
             if (bitCount > TotalBits)
+            {
+                data = null;
                 return false;
+            }
 
             data = new byte[typeBytes];
 

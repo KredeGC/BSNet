@@ -146,9 +146,7 @@ namespace BSNet
             byte[] rawBytes = SendRawMessage(endPoint, ConnectionType.CONNECT, connection.LocalToken, writer =>
             {
                 // Pad message to 1024 bytes
-                int length = RECEIVE_BUFFER_SIZE * BSUtility.BYTE_BITS - writer.TotalBits;
-                byte[] padding = new byte[RECEIVE_BUFFER_SIZE];
-                writer.SerializeBytes(ref padding, length);
+                writer.PadToEnd();
             });
             AddReliableMessage(endPoint, connection, rawBytes);
         }
@@ -287,19 +285,13 @@ namespace BSNet
         /// <param name="ack"></param>
         /// <param name="ackBits"></param>
         /// <param name="token"></param>
-        protected virtual bool SerializeHeader(IBSStream stream, ref byte type, ref ushort sequence, ref ushort ack, ref uint ackBits, ref ulong token)
+        protected virtual void SerializeHeader(IBSStream stream, ref byte type, ref ushort sequence, ref ushort ack, ref uint ackBits, ref ulong token)
         {
-            if (!stream.SerializeByte(ref type, 3))
-                return false;
-            if (!stream.SerializeUShort(ref sequence))
-                return false;
-            if (!stream.SerializeUShort(ref ack))
-                return false;
-            if (!stream.SerializeUInt(ref ackBits))
-                return false;
-            if (!stream.SerializeULong(ref token))
-                return false;
-            return true;
+            type = stream.SerializeByte(type, 3);
+            sequence = stream.SerializeUShort(sequence);
+            ack = stream.SerializeUShort(ack);
+            ackBits = stream.SerializeUInt(ackBits);
+            token = stream.SerializeULong(token);
         }
 
         /// <summary>
@@ -342,7 +334,7 @@ namespace BSNet
                 inComingBipS += length * 8;
 
                 // Read the buffer and extract header
-                BSReader reader = new BSReader(rawBytes, length);
+                IBSStream reader = new BSReader(rawBytes, length);
                 byte type = 0;
                 ushort sequence = 0;
                 ushort ack = 0;
@@ -380,9 +372,7 @@ namespace BSNet
                             byte[] bytes = SendRawMessage(endPoint, ConnectionType.CONNECT, connection.LocalToken, writer =>
                             {
                                 // Pad message to 1024 bytes
-                                int remaining = RECEIVE_BUFFER_SIZE * BSUtility.BYTE_BITS - writer.TotalBits;
-                                byte[] padding = new byte[RECEIVE_BUFFER_SIZE];
-                                writer.SerializeBytes(ref padding, remaining);
+                                writer.PadToEnd();
                             });
                             AddReliableMessage(endPoint, connection, bytes);
                         }
@@ -460,7 +450,7 @@ namespace BSNet
                 {
                     // Get header
                     byte[] rawBytes = unsentMessages[data.Key].bytes;
-                    BSReader reader = new BSReader(rawBytes);
+                    IBSStream reader = new BSReader(rawBytes);
                     byte type = 0;
                     ushort sequence = 0;
                     ushort ack = 0;
@@ -475,8 +465,7 @@ namespace BSNet
 
                     // Get payload
                     int bits = reader.TotalBits;
-                    byte[] payload = null;
-                    reader.SerializeBytes(ref payload, bits); // TODO: Check for false?
+                    byte[] payload = reader.SerializeBytes(bits);
 
                     // Remove message and clear RTT
                     connection.ClearRTT(data.Key.sequence);
@@ -488,7 +477,7 @@ namespace BSNet
 
                     byte[] newBytes = SendRawMessage(data.Key.endPoint, type, token, writer =>
                     {
-                        writer.SerializeBytes(ref payload, bits);
+                        writer.SerializeBytes(bits, payload);
                     });
 
                     // Add message to backlog

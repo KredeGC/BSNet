@@ -57,7 +57,7 @@ public class Client : BSSocket
         // Send a message to the connected IPEndPoint
         SendMessageReliable(endPoint, writer =>
         {
-            writer.WriteString("Hello network!", encoding);
+            writer.SerializeString("Hello network!", encoding);
         });
     }
 	
@@ -71,7 +71,7 @@ public class Client : BSSocket
     protected override void OnReceiveMessage(IPEndPoint endPoint, IBSStream reader)
     {
         // Receive the message, "Hello network!", from the other end
-        string message = reader.ReadString(encoding);
+        string message = reader.SerializeString(null, encoding);
         Log(message);
     }
 }
@@ -89,8 +89,8 @@ BSWriter writer = new BSWriter();
 BoundedRange range = new BoundedRange(0, 1, 0.01f);
 
 // Write a couple of floats to the writer
-writer.WriteFloat(0.23167f, range);
-writer.WriteFloat(0.55f, range);
+writer.SerializeFloat(0.23167f, range);
+writer.SerializeFloat(0.55f, range);
 
 // Return the bytes in a packed array
 byte[] bytes = writer.ToArray();
@@ -101,7 +101,7 @@ Console.WriteLine($"Total length of byte array: {bytes.Length}"); // Prints 2
 BSReader reader = new BSReader(bytes);
 
 // Read the 2 floats
-float firstFloat = reader.ReadFloat(range);
-float secondFloat = reader.ReadFloat(range);
+float firstFloat = reader.SerializeFloat(0, range);
+float secondFloat = reader.SerializeFloat(0, range);
 Console.WriteLine($"Floats read: {firstFloat}, {secondFloat}"); // Prints 0.23 and 0.55
 ```

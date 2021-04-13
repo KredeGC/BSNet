@@ -16,36 +16,39 @@ namespace BSNet.Stream
         bool Reading { get; }
         int TotalBits { get; }
 
+        // Padding
+        byte[] PadToEnd();
+
         // Unsigned
-        bool SerializeByte(ref byte value, int bitCount = sizeof(byte) * BSUtility.BYTE_BITS);
-        bool SerializeUShort(ref ushort value, int bitCount = sizeof(ushort) * BSUtility.BYTE_BITS);
-        bool SerializeUInt(ref uint value, int bitCount = sizeof(uint) * BSUtility.BYTE_BITS);
-        bool SerializeULong(ref ulong value, int bitCount = sizeof(ulong) * BSUtility.BYTE_BITS);
+        byte SerializeByte(byte value = default(byte), int bitCount = sizeof(byte) * BSUtility.BYTE_BITS);
+        ushort SerializeUShort(ushort value = default(ushort), int bitCount = sizeof(ushort) * BSUtility.BYTE_BITS);
+        uint SerializeUInt(uint value = default(uint), int bitCount = sizeof(uint) * BSUtility.BYTE_BITS);
+        ulong SerializeULong(ulong value = default(ulong), int bitCount = sizeof(ulong) * BSUtility.BYTE_BITS);
 
         // Signed
-        bool SerializeSByte(ref sbyte value, int bitCount = sizeof(sbyte) * BSUtility.BYTE_BITS);
-        bool SerializeShort(ref short value, int bitCount = sizeof(short) * BSUtility.BYTE_BITS);
-        bool SerializeInt(ref int value, int bitCount = sizeof(int) * BSUtility.BYTE_BITS);
-        bool SerializeLong(ref long value, int bitCount = sizeof(long) * BSUtility.BYTE_BITS);
+        sbyte SerializeSByte(sbyte value = default(sbyte), int bitCount = sizeof(sbyte) * BSUtility.BYTE_BITS);
+        short SerializeShort(short value = default(short), int bitCount = sizeof(short) * BSUtility.BYTE_BITS);
+        int SerializeInt(int value = default(int), int bitCount = sizeof(int) * BSUtility.BYTE_BITS);
+        long SerializeLong(long value = default(long), int bitCount = sizeof(long) * BSUtility.BYTE_BITS);
 
         // Floating point
-        bool SerializeFloat(ref float value, BoundedRange range);
-        bool SerializeHalf(ref float value);
+        float SerializeFloat(BoundedRange range, float value = default(float));
+        float SerializeHalf(float value = default(float));
 
         // Vectors & Quaternions
-        bool SerializeVector2(ref Vector2 vec, BoundedRange[] range);
-        bool SerializeVector3(ref Vector3 vec, BoundedRange[] range);
-        bool SerializeVector4(ref Vector4 vec, BoundedRange[] range);
-        bool SerializeQuaternion(ref Quaternion quat, int bitsPerElement = 12);
+        Vector2 SerializeVector2(BoundedRange[] range, Vector2 vec = default(Vector2));
+        Vector3 SerializeVector3(BoundedRange[] range, Vector3 vec = default(Vector3));
+        Vector4 SerializeVector4(BoundedRange[] range, Vector4 vec = default(Vector4));
+        Quaternion SerializeQuaternion(int bitsPerElement = 12, Quaternion quat = default(Quaternion));
 
         // String
-        bool SerializeString(ref string value, Encoding encoding);
+        string SerializeString(Encoding encoding, string value = null);
 
         // IPs
-        bool SerializeIPAddress(ref IPAddress ipAddress);
-        bool SerializeIPEndPoint(ref IPEndPoint endPoint);
+        IPAddress SerializeIPAddress(IPAddress ipAddress = default(IPAddress));
+        IPEndPoint SerializeIPEndPoint(IPEndPoint endPoint = default(IPEndPoint));
 
         // Bytes
-        bool SerializeBytes(ref byte[] bytes, int bitCount);
+        byte[] SerializeBytes(int bitCount, byte[] bytes = null);
     }
 }
