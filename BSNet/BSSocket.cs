@@ -54,6 +54,7 @@ namespace BSNet
 
         // Properties
         public virtual double TickRate { private set; get; }
+        public virtual byte[] ProtocolVersion { get; }
 
         // Socket stuff
         protected double nextMessage;
@@ -252,6 +253,7 @@ namespace BSNet
                     ref token);
             }
             action?.Invoke(writer);
+            writer.SerializeChecksum(ProtocolVersion);
 
             byte[] rawBytes = writer.ToArray();
 
@@ -334,7 +336,10 @@ namespace BSNet
                 inComingBipS += length * 8;
 
                 // Read the buffer and extract header
-                IBSStream reader = new BSReader(rawBytes, length);
+                BSReader reader = new BSReader(rawBytes, length);
+                if (!reader.SerializeChecksum(ProtocolVersion))
+                    continue;
+
                 byte type = 0;
                 ushort sequence = 0;
                 ushort ack = 0;
@@ -450,7 +455,9 @@ namespace BSNet
                 {
                     // Get header
                     byte[] rawBytes = unsentMessages[data.Key].bytes;
-                    IBSStream reader = new BSReader(rawBytes);
+                    BSReader reader = new BSReader(rawBytes);
+                    reader.SerializeChecksum(ProtocolVersion);
+
                     byte type = 0;
                     ushort sequence = 0;
                     ushort ack = 0;

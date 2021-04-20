@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Net;
 using System.Text;
 using BSNet.Quantization;
+using System.Linq;
 
 #if !(ENABLE_MONO || ENABLE_IL2CPP)
 using System.Numerics;
@@ -29,6 +30,26 @@ namespace BSNet.Stream
         private int bitPos = 1;
         private bool forceAddByte;
 
+
+        // CRC Header
+        public bool SerializeChecksum(byte[] version)
+        {
+            byte[] data = ToArray();
+
+            byte[] combinedBytes = new byte[version.Length + data.Length];
+            Buffer.BlockCopy(version, 0, combinedBytes, 0, version.Length);
+            Buffer.BlockCopy(data, 0, combinedBytes, version.Length, data.Length);
+
+            byte[] crcBytes = Cryptography.CRC32Bytes(combinedBytes);
+
+            byte[] headerBytes = new byte[crcBytes.Length + data.Length];
+            Buffer.BlockCopy(crcBytes, 0, headerBytes, 0, crcBytes.Length);
+            Buffer.BlockCopy(data, 0, headerBytes, crcBytes.Length, data.Length);
+
+            internalStream = headerBytes.ToList();
+
+            return true;
+        }
 
         // Padding
         public byte[] PadToEnd()

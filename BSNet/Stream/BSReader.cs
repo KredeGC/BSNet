@@ -30,12 +30,39 @@ namespace BSNet.Stream
 
         public BSReader(byte[] byteStream, int length)
         {
-            internalStream = new byte[byteStream.Length];
+            internalStream = new byte[length];
             Buffer.BlockCopy(byteStream, 0, internalStream, 0, length);
         }
 
         public BSReader(byte[] byteStream) : this(byteStream, byteStream.Length) { }
 
+
+        // CRC Header
+        public bool SerializeChecksum(byte[] version)
+        {
+            byte[] crcBytes = new byte[4];
+            byte[] headerBytes = internalStream;
+
+            byte[] data = new byte[headerBytes.Length - crcBytes.Length];
+            Buffer.BlockCopy(headerBytes, 0, crcBytes, 0, crcBytes.Length);
+            Buffer.BlockCopy(headerBytes, crcBytes.Length, data, 0, data.Length);
+
+            byte[] combinedBytes = new byte[version.Length + data.Length];
+            Buffer.BlockCopy(version, 0, combinedBytes, 0, version.Length);
+            Buffer.BlockCopy(data, 0, combinedBytes, version.Length, data.Length);
+
+            byte[] generatedBytes = Cryptography.CRC32Bytes(combinedBytes);
+
+            for (int i = 0; i < crcBytes.Length; i++)
+            {
+                if (!crcBytes[i].Equals(generatedBytes[i]))
+                    return false;
+            }
+
+            internalStream = data;
+
+            return true;
+        }
 
         // Padding
         public byte[] PadToEnd()

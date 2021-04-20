@@ -3,7 +3,7 @@ using System.Security.Cryptography;
 
 namespace BSNet
 {
-    public static class Cryptography
+    internal static class Cryptography
     {
         private static RNGCryptoServiceProvider rng = new RNGCryptoServiceProvider();
 
