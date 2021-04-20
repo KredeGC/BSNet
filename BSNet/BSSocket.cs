@@ -62,6 +62,15 @@ namespace BSNet
         protected Socket socket;
         protected const int SIO_UDP_CONNRESET = -1744830452;
 
+        // P2P Protocol
+        protected const int headerSize =
+            sizeof(uint) + // CRC32 of version + packet (4 bytes)
+            sizeof(byte) + // ConnectionType (3 bits)
+            sizeof(ushort) + // Sequence of this packet (2 bytes)
+            sizeof(ushort) + // Acknowledgement for most recent packet (2 bytes)
+            sizeof(uint) + // Bitfield of acknowledgements before most recent (4 bytes)
+            sizeof(ulong); // Token or LocalToken if not authenticated (8 bytes)
+
         // Network statistics
         protected double nextBip;
         protected int inComingBipS = 0;
@@ -119,14 +128,6 @@ namespace BSNet
                 ReceiveMessages();
             }
         }
-
-        // P2P Protocol:
-        // byte - connection type
-        // ushort - sequence
-        // ushort - an acknowledgement for most recent packet
-        // uint - bitfield of acknowledgements before recent
-        // ulong - token if logged in, otherwise localToken
-        // any other payload...
 
         /// <summary>
         /// Attempts to establish a connection with the endPoint, if one doesn't already exist
@@ -330,7 +331,7 @@ namespace BSNet
                 //if (random.Next(100) < 25) return; // DEBUG
 
                 // The length is less than the header, certainly malicious
-                if (length < sizeof(byte) + 2 * sizeof(ushort) + sizeof(uint) + sizeof(ulong))
+                if (length < headerSize)
                     continue;
 
                 inComingBipS += length * 8;

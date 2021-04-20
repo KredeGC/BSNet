@@ -7,7 +7,8 @@ Should NOT be used with sensitive data as no encryption occurs, whatsoever.
 * Connection-based, built on top of UDP with keep-alive packets.
 * Supports both reliable and unreliable packets over UDP.
 * Reliability layer with acknowledgements redundantly sent in every packet.
-* 16 bytes (and 3 bits) of packet overhead.
+* 20 bytes (and 3 bits) of packet overhead.
+* CRC32 to protect against old clients and accidental connections.
 * Bitpacking mostly based on [BitPackerTools](https://github.com/LazyBui/BitPackerTools), with some improvements.
 * Quantization of floats, Vectors and Quaternions, from [NetStack](https://github.com/nxrighthere/NetStack).
 * Made for .NET Framework 4.6.1 and Unity.
@@ -16,13 +17,13 @@ Should NOT be used with sensitive data as no encryption occurs, whatsoever.
 * IP spoofing (A challenge packet is sent when connections are requested).
 * Replay attacks (All packets have unique sequence numbers, and can't be used multiple times).
 * DDoS amplification (Connection packets enforce padding in messages).
+* Old clients and accidental connections.
 
 ### What this doesn't protect against
 * Man in the middle attacks (Proper encryption would be needed for that).
 * Zombie clients.
 
 ### Future ideas
-* CRC32 to protect against old clients and accidental connections.
 * Some sort of packet fragmentation.
 
 # Usage
@@ -32,6 +33,14 @@ This is an example of a simple P2P architecture, where both ends connect to each
 public class Client : BSSocket
 {
     protected Encoding encoding = new ASCIIEncoding();
+
+	protected override byte[] ProtocolVersion
+    {
+        get
+        {
+            return new byte[] { 0x00, 0x00, 0x00, 0x01 };
+        }
+    }
     
     public Client(int localPort, string peerIP, int peerPort) : base(localPort)
     {
@@ -57,7 +66,7 @@ public class Client : BSSocket
         // Send a message to the connected IPEndPoint
         SendMessageReliable(endPoint, writer =>
         {
-            writer.SerializeString("Hello network!", encoding);
+            writer.SerializeString(encoding, "Hello network!");
         });
     }
 	
@@ -71,7 +80,7 @@ public class Client : BSSocket
     protected override void OnReceiveMessage(IPEndPoint endPoint, IBSStream reader)
     {
         // Receive the message, "Hello network!", from the other end
-        string message = reader.SerializeString(null, encoding);
+        string message = reader.SerializeString(encoding);
         Log(message);
     }
 }
@@ -89,8 +98,8 @@ BSWriter writer = new BSWriter();
 BoundedRange range = new BoundedRange(0, 1, 0.01f);
 
 // Write a couple of floats to the writer
-writer.SerializeFloat(0.23167f, range);
-writer.SerializeFloat(0.55f, range);
+writer.SerializeFloat(range, 0.23167f);
+writer.SerializeFloat(range, 0.55f);
 
 // Return the bytes in a packed array
 byte[] bytes = writer.ToArray();
@@ -101,7 +110,7 @@ Console.WriteLine($"Total length of byte array: {bytes.Length}"); // Prints 2
 BSReader reader = new BSReader(bytes);
 
 // Read the 2 floats
-float firstFloat = reader.SerializeFloat(0, range);
-float secondFloat = reader.SerializeFloat(0, range);
+float firstFloat = reader.SerializeFloat(range);
+float secondFloat = reader.SerializeFloat(range);
 Console.WriteLine($"Floats read: {firstFloat}, {secondFloat}"); // Prints 0.23 and 0.55
 ```

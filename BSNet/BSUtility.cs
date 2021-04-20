@@ -1,14 +1,16 @@
-﻿using System.Linq;
+﻿using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
+using System.Net.Sockets;
 
 namespace BSNet
 {
-    public static class BSUtility
+    internal static class BSUtility
     {
         public const int BYTE_BITS = 8;
 
-        private static byte[] sBitMasks;
+        private static readonly byte[] sBitMasks;
 
         static BSUtility()
         {
@@ -34,6 +36,66 @@ namespace BSNet
             bitMask <<= (BYTE_BITS - bitCount);
             bitMask >>= startBit;
             return bitMask;
+        }
+
+        /// <summary>
+        /// Return this NAT's external IPAddress
+        /// </summary>
+        /// <returns></returns>
+        public static IPAddress GetExternalIP()
+        {
+            IEnumerable<IPAddress> gateways = from networkInterface in NetworkInterface.GetAllNetworkInterfaces()
+                                              where
+                                                  networkInterface.OperationalStatus == OperationalStatus.Up ||
+                                                  networkInterface.OperationalStatus == OperationalStatus.Unknown
+                                              from address in networkInterface.GetIPProperties().GatewayAddresses
+                                              where address.Address.AddressFamily == AddressFamily.InterNetwork
+                                              select address.Address;
+
+
+            IEnumerable<IPAddress> unicastAddresses = from networkInterface in NetworkInterface.GetAllNetworkInterfaces()
+                                                      where
+                                                          networkInterface.OperationalStatus == OperationalStatus.Up ||
+                                                          networkInterface.OperationalStatus == OperationalStatus.Unknown
+                                                      from address in networkInterface.GetIPProperties().UnicastAddresses
+                                                      where address.Address.AddressFamily == AddressFamily.InterNetwork
+                                                      select address.Address;
+
+
+            foreach (IPAddress uniAddress in unicastAddresses)
+            {
+                try
+                {
+                    using (UdpClient client = new UdpClient(new IPEndPoint(uniAddress, 0)))
+                    {
+                        foreach (IPAddress gateway in gateways)
+                        {
+                            IPEndPoint gatewayEndPoint = new IPEndPoint(gateway, 5351); // PMP Port is 5351
+
+                            // Send a request
+                            try
+                            {
+                                byte[] buffer = new byte[] { 0, 0 };
+                                client.Send(buffer, buffer.Length, gatewayEndPoint);
+                            }
+                            catch (SocketException) { continue; }
+
+                            // Receive external IP
+                            IPEndPoint receivedFrom = new IPEndPoint(IPAddress.None, 0);
+                            byte[] response = client.Receive(ref receivedFrom);
+
+                            if (response.Length != 12 || response[0] != 0 || response[1] != 128) // 128 is server NOOP
+                                continue;
+
+                            byte[] addressBytes = new[] { response[8], response[9], response[10], response[11] };
+                            return new IPAddress(addressBytes);
+                        }
+                    }
+                }
+                catch (SocketException) { continue; }
+            }
+
+            return null;
         }
 
         /// <summary>
