@@ -53,6 +53,7 @@ namespace BSNet
 #endif
 
         // Properties
+        public virtual int TicksPerSecond { private set; get; }
         public virtual double TickRate { private set; get; }
         public virtual byte[] ProtocolVersion { get; }
 
@@ -82,6 +83,7 @@ namespace BSNet
 
         public BSSocket(int port, int ticksPerSecond)
         {
+            TicksPerSecond = ticksPerSecond;
             TickRate = 1d / ticksPerSecond;
 
             // Create the socket and listen for packets
@@ -476,7 +478,6 @@ namespace BSNet
                     byte[] payload = reader.SerializeBytes(bits);
 
                     // Remove message and clear RTT
-                    connection.ClearRTT(data.Key.sequence);
                     unsentMessages.Remove(data.Key);
 
                     // Increment sequence

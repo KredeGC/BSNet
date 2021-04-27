@@ -34,7 +34,7 @@ public class Client : BSSocket
 {
     protected Encoding encoding = new ASCIIEncoding();
 
-	protected override byte[] ProtocolVersion
+    protected override byte[] ProtocolVersion
     {
         get
         {

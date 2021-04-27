@@ -1,6 +1,4 @@
-﻿using System.Collections.Generic;
-
-namespace BSNet
+﻿namespace BSNet
 {
     public class ClientConnection
     {
@@ -16,7 +14,8 @@ namespace BSNet
         public bool Authenticated { private set; get; }
         public ulong Token { get { return LocalToken ^ RemoteToken; } }
 
-        private Dictionary<ushort, double> roundTrips = new Dictionary<ushort, double>();
+        private double[] roundTrips = new double[256];
+        //private Dictionary<ushort, double> roundTrips = new Dictionary<ushort, double>();
 
         public ClientConnection(double time, ulong localToken, ulong remoteToken)
         {
@@ -63,24 +62,13 @@ namespace BSNet
 
         public void AddRTT(ushort sequence, double time)
         {
-            if (!roundTrips.ContainsKey(sequence))
-                roundTrips.Add(sequence, time);
+            roundTrips[sequence % roundTrips.Length] = time;
         }
 
         public void UpdateRTT(ushort sequence, double time)
         {
-            if (roundTrips.TryGetValue(sequence, out double sent))
-            {
-                double rtt = time - sent;
-                roundTrips.Remove(sequence);
-
-                RTT = RTT * 0.9d + rtt * 0.1d;
-            }
-        }
-
-        public void ClearRTT(ushort sequence)
-        {
-            roundTrips.Remove(sequence);
+            double rtt = time - roundTrips[sequence % roundTrips.Length];
+            RTT = RTT * 0.9d + rtt * 0.1d;
         }
 
         public void Acknowledge(ushort sequence)
