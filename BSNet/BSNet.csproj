@@ -46,6 +46,7 @@
   <ItemGroup>
     <Compile Include="BSNet\BSSocket.cs" />
     <Compile Include="BSNet\BSUtility.cs" />
+    <Compile Include="BSNet\BufferPool.cs" />
     <Compile Include="BSNet\ClientConnection.cs" />
     <Compile Include="BSNet\ConnectionType.cs" />
     <Compile Include="BSNet\Cryptography.cs" />
@@ -55,6 +56,7 @@
     <Compile Include="BSNet\Stream\BSReader.cs" />
     <Compile Include="BSNet\Stream\BSWriter.cs" />
     <Compile Include="BSNet\Stream\IBSStream.cs" />
+    <Compile Include="ExampleClient.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ExampleProgram.cs" />
   </ItemGroup>

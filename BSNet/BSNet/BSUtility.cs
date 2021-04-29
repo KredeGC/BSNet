@@ -39,7 +39,7 @@ namespace BSNet
         }
 
         /// <summary>
-        /// Return this NAT's external IPAddress
+        /// Return this NAT's external IPAddress, sometimes
         /// </summary>
         /// <returns></returns>
         public static IPAddress GetExternalIP()
@@ -127,7 +127,7 @@ namespace BSNet
         /// </summary>
         /// <param name="seq1">The first sequence</param>
         /// <param name="seq2">The second sequence</param>
-        /// <returns></returns>
+        /// <returns>Whether seq1 is newer than seq2</returns>
         public static bool IsGreaterThan(ushort seq1, ushort seq2)
         {
             return ((seq1 > seq2) && (seq1 - seq2 <= 32768)) ||
@@ -137,10 +137,10 @@ namespace BSNet
         /// <summary>
         /// Returns whether the given sequence is acknowledged
         /// </summary>
-        /// <param name="bits"></param>
-        /// <param name="lastSequence"></param>
-        /// <param name="sequence"></param>
-        /// <returns></returns>
+        /// <param name="bits">The bitfield to test within</param>
+        /// <param name="lastSequence">The highest sequence of the bitfield</param>
+        /// <param name="sequence">The sequence to test</param>
+        /// <returns>Whether the given sequence is contained within the bitfield</returns>
         public static bool IsAcknowledged(uint bits, ushort lastSequence, ushort sequence)
         {
             if (lastSequence == sequence)

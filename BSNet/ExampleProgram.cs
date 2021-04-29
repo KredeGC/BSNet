@@ -1,6 +1,4 @@
-﻿using BSNet.Quantization;
-using BSNet.Stream;
-using System;
+﻿using System;
 
 namespace BSNet.Example
 {
@@ -8,32 +6,32 @@ namespace BSNet.Example
     {
         public static void Main(string[] args)
         {
-            //Console.WriteLine(BSUtility.GetExternalIP());
+            ExampleClient client1 = new ExampleClient(1609, "127.0.0.1", 1615);
+            ExampleClient client2 = new ExampleClient(1615, "127.0.0.1", 1609);
 
 
-            byte[] protocolVersion = new byte[] { 0x00, 0x00, 0x00, 0x01 };
+            while (true)
+            {
+                client1.Update();
+                client2.Update();
 
-            BoundedRange range = new BoundedRange(-1f, 1f, 0.01f);
+                if (Console.KeyAvailable)
+                {
+                    ConsoleKey key = Console.ReadKey(true).Key;
+                    if (key == ConsoleKey.Q)
+                    {
+                        break;
+                    }
+                    else if (key == ConsoleKey.D1)
+                    {
+                        client1.Dispose();
+                        client1 = new ExampleClient(1609, "127.0.0.1", 1615);
+                    }
+                }
+            }
 
-            // Bit writer
-            BSWriter writer = new BSWriter();
-
-            writer.SerializeFloat(range, -0.12345f);
-            writer.SerializeChecksum(protocolVersion);
-
-            byte[] data = writer.ToArray();
-
-            // Bit reader
-            BSReader reader = new BSReader(data);
-
-            bool checksum = reader.SerializeChecksum(protocolVersion);
-            float number = reader.SerializeFloat(range);
-
-            Console.WriteLine(checksum);
-            Console.WriteLine(number);
-
-
-            Console.ReadKey();
+            client1.Dispose();
+            client2.Dispose();
         }
     }
 }

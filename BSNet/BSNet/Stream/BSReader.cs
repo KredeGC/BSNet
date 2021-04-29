@@ -11,7 +11,7 @@ using UnityEngine;
 
 namespace BSNet.Stream
 {
-    public class BSReader : IBSStream
+    public class BSReader : IBSStream, IDisposable
     {
         public bool Writing { get { return false; } }
         public bool Reading { get { return true; } }
@@ -30,24 +30,40 @@ namespace BSNet.Stream
 
         public BSReader(byte[] byteStream, int length)
         {
-            internalStream = new byte[length];
+            internalStream = BufferPool.GetBuffer(length);
             Buffer.BlockCopy(byteStream, 0, internalStream, 0, length);
         }
 
         public BSReader(byte[] byteStream) : this(byteStream, byteStream.Length) { }
 
+        ~BSReader()
+        {
+            Dispose(false);
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            BufferPool.ReturnBuffer(internalStream);
+        }
+
 
         // CRC Header
         public bool SerializeChecksum(byte[] version)
         {
-            byte[] crcBytes = new byte[4];
+            byte[] crcBytes = BufferPool.GetBuffer(4);
             byte[] headerBytes = internalStream;
 
-            byte[] data = new byte[headerBytes.Length - crcBytes.Length];
+            byte[] data = BufferPool.GetBuffer(headerBytes.Length - crcBytes.Length);
             Buffer.BlockCopy(headerBytes, 0, crcBytes, 0, crcBytes.Length);
             Buffer.BlockCopy(headerBytes, crcBytes.Length, data, 0, data.Length);
 
-            byte[] combinedBytes = new byte[version.Length + data.Length];
+            byte[] combinedBytes = BufferPool.GetBuffer(version.Length + data.Length);
             Buffer.BlockCopy(version, 0, combinedBytes, 0, version.Length);
             Buffer.BlockCopy(data, 0, combinedBytes, version.Length, data.Length);
 
@@ -59,7 +75,12 @@ namespace BSNet.Stream
                     return false;
             }
 
+            BufferPool.ReturnBuffer(internalStream);
+
             internalStream = data;
+
+            BufferPool.ReturnBuffer(crcBytes);
+            BufferPool.ReturnBuffer(combinedBytes);
 
             return true;
         }
@@ -67,7 +88,7 @@ namespace BSNet.Stream
         // Padding
         public byte[] PadToEnd()
         {
-            int remaining = BSSocket.RECEIVE_BUFFER_SIZE * BSUtility.BYTE_BITS - TotalBits;
+            int remaining = (BSSocket.RECEIVE_BUFFER_SIZE - 4) * BSUtility.BYTE_BITS - TotalBits;
             byte[] padding = SerializeBytes(remaining);
             return padding;
         }

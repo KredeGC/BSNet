@@ -41,7 +41,7 @@ namespace BSNet
                 result = ChecksumTable[(result & 0xFF) ^ current] ^ (result >> 8);
 
             result = ~result;
-            byte[] crc = new byte[4];
+            byte[] crc = BufferPool.GetBuffer(4);
             crc[0] = (byte)(result >> 24);
             crc[1] = (byte)(result >> 16);
             crc[2] = (byte)(result >> 8);
@@ -53,16 +53,21 @@ namespace BSNet
 
         public static ulong GenerateToken()
         {
-            byte[] token = new byte[8];
-            GetBytes(token);
-            return (ulong)token[0] << 56 |
-                (ulong)token[1] << 48 |
-                (ulong)token[2] << 40 |
-                (ulong)token[3] << 32 |
-                (ulong)token[4] << 24 |
-                (ulong)token[5] << 16 |
-                (ulong)token[6] << 8 |
-                (ulong)token[7];
+            byte[] tokenBytes = BufferPool.GetBuffer(8);
+            GetBytes(tokenBytes);
+
+            ulong token = (ulong)tokenBytes[0] << 56 |
+                (ulong)tokenBytes[1] << 48 |
+                (ulong)tokenBytes[2] << 40 |
+                (ulong)tokenBytes[3] << 32 |
+                (ulong)tokenBytes[4] << 24 |
+                (ulong)tokenBytes[5] << 16 |
+                (ulong)tokenBytes[6] << 8 |
+                (ulong)tokenBytes[7];
+
+            BufferPool.ReturnBuffer(tokenBytes);
+
+            return token;
         }
     }
 }
