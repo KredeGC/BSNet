@@ -72,7 +72,13 @@ namespace BSNet.Stream
             for (int i = 0; i < crcBytes.Length; i++)
             {
                 if (!crcBytes[i].Equals(generatedBytes[i]))
+                {
+                    BufferPool.ReturnBuffer(data);
+                    BufferPool.ReturnBuffer(crcBytes);
+                    BufferPool.ReturnBuffer(combinedBytes);
+
                     return false;
+                }
             }
 
             BufferPool.ReturnBuffer(internalStream);
