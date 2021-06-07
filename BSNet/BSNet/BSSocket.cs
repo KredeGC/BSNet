@@ -27,15 +27,28 @@ namespace BSNet
             }
         }
 
-        protected struct ReliableMessage
+        protected struct Packet
         {
+            public EndPoint endPoint;
             public byte[] bytes;
-            public double timeSent;
+            public double time;
 
-            public ReliableMessage(byte[] bytes, double timeSent)
+            public Packet(EndPoint endPoint, byte[] bytes, int length, double time)
             {
-                this.bytes = bytes;
-                this.timeSent = timeSent;
+                this.endPoint = endPoint;
+                this.bytes = new byte[length];
+                this.time = time;
+
+                Buffer.BlockCopy(bytes, 0, this.bytes, 0, length);
+            }
+
+            public Packet(EndPoint endPoint, byte[] bytes, double time)
+            {
+                this.endPoint = endPoint;
+                this.bytes = new byte[bytes.Length];
+                this.time = time;
+
+                Buffer.BlockCopy(bytes, 0, this.bytes, 0, bytes.Length);
             }
         }
 
@@ -55,6 +68,16 @@ namespace BSNet
         // Properties
         public virtual double TickRate { protected set; get; }
         public abstract byte[] ProtocolVersion { get; }
+
+#if NETWORK_DEBUG
+        // Network debugging
+        public virtual int SimulatedPacketLoss { set; get; } // 0-1000
+        public virtual int SimulatedPacketLatency { set; get; } // 0-1000
+
+        protected System.Random random = new System.Random();
+
+        protected List<Packet> latencyList = new List<Packet>();
+#endif
 
         // Socket stuff
         protected double nextMessage;
@@ -79,7 +102,7 @@ namespace BSNet
 
         // Connections & reliable messages
         protected Dictionary<EndPoint, ClientConnection> connections = new Dictionary<EndPoint, ClientConnection>();
-        protected Dictionary<ConnectionSequence, ReliableMessage> unsentMessages = new Dictionary<ConnectionSequence, ReliableMessage>();
+        protected Dictionary<ConnectionSequence, Packet> unsentMessages = new Dictionary<ConnectionSequence, Packet>();
         protected List<EndPoint> lastTimedOut = new List<EndPoint>();
         protected List<EndPoint> lastHeartBeats = new List<EndPoint>();
 
@@ -317,20 +340,148 @@ namespace BSNet
         /// <param name="bytes">The payload of the packet</param>
         protected virtual void AddReliableMessage(ClientConnection connection, byte[] bytes)
         {
-            ReliableMessage msg = new ReliableMessage(bytes, ElapsedTime);
+            Packet msg = new Packet(connection.AddressPoint, bytes, ElapsedTime);
 
             ConnectionSequence connSeq = new ConnectionSequence(connection.AddressPoint, connection.LocalSequence);
             if (!unsentMessages.ContainsKey(connSeq))
                 unsentMessages.Add(connSeq, msg);
         }
 
-        //System.Random random = new System.Random();
+        /// <summary>
+        /// Called to handle a specified message in raw byte format
+        /// </summary>
+        /// <param name="rawBytes">The bytes to handle</param>
+        /// <param name="length">Length of the byte array</param>
+        protected virtual void HandleMessage(EndPoint endPoint, byte[] rawBytes, int length)
+        {
+            inComingBipS += length * 8;
+
+            // The length is less than the header, certainly malicious
+            if (length < headerSize)
+            {
+                BufferPool.ReturnBuffer(rawBytes);
+                return;
+            }
+
+            // Read the buffer and determine CRC
+            using (BSReader reader = new BSReader(rawBytes, length))
+            {
+                if (!reader.SerializeChecksum(ProtocolVersion))
+                    return;
+
+                // Read header
+                byte type = 0;
+                ushort sequence = 0;
+                ushort ack = 0;
+                uint ackBits = 0;
+                ulong token = 0;
+                SerializeHeader(reader,
+                    ref type,
+                    ref sequence,
+                    ref ack,
+                    ref ackBits,
+                    ref token);
+
+                // Handle the message
+                if (type == ConnectionType.CONNECT) // If this endPoint wants to establish connection
+                {
+                    if (length == RECEIVE_BUFFER_SIZE) // Make sure this message has been padded
+                    {
+                        if (connections.TryGetValue(endPoint, out ClientConnection connection))
+                        {
+                            // Acknowledge this packet
+                            connection.Acknowledge(sequence);
+                        }
+                        else
+                        {
+                            // Add this connection to the list
+                            ulong localToken = Cryptography.GenerateToken();
+                            connection = new ClientConnection(endPoint, ElapsedTime, localToken, token);
+                            connections.Add(endPoint, connection);
+
+                            // Acknowledge this packet
+                            connection.Acknowledge(sequence);
+
+                            // Send a connection message to the sender
+                            byte[] bytes = SendRawMessage(connection, ConnectionType.CONNECT, connection.LocalToken, writer =>
+                            {
+                                // Pad message to 1024 bytes
+                                writer.PadToEnd();
+                            });
+                            AddReliableMessage(connection, bytes);
+                        }
+
+                        // If this connection is not authenticated
+                        if (!connection.Authenticated)
+                        {
+                            connection.Authenticate(token, ElapsedTime);
+                            OnConnect((IPEndPoint)endPoint);
+                        }
+                    }
+                }
+                else if (connections.TryGetValue(endPoint, out ClientConnection connection))
+                {
+                    if (type == ConnectionType.DISCONNECT) // If this endPoint wants to disconnect
+                    {
+                        // If this connection is authenticated
+                        if (connection.Authenticated && connection.Authenticate(token, ElapsedTime))
+                        {
+                            connections.Remove(endPoint);
+                            OnDisconnect((IPEndPoint)endPoint);
+                        }
+                    }
+                    else if (connection.Authenticated) // If this endPoint has been authenticated
+                    {
+                        // Compare the tokens
+                        if (connection.Authenticate(token, ElapsedTime))
+                        {
+                            // Remove acknowledged messages
+                            for (int i = 31; i >= 0; i--)
+                            {
+                                ushort seq = (ushort)(ack - i);
+                                if (BSUtility.IsAcknowledged(ackBits, ack, seq))
+                                {
+                                    connection.UpdateRTT(seq, ElapsedTime);
+                                    unsentMessages.Remove(new ConnectionSequence(endPoint, seq));
+                                    // OnMessageAcknowledged(seq);
+                                }
+                            }
+
+                            // Validate packet and return payload to application
+                            if (!connection.IsAcknowledged(sequence) && type == ConnectionType.MESSAGE)
+                                OnReceiveMessage((IPEndPoint)endPoint, reader);
+
+                            // Acknowledge this packet
+                            connection.Acknowledge(sequence);
+                        }
+                        else
+                        {
+                            Log($"Mismatching token for {endPoint}", LogLevel.Warning);
+                        }
+                    }
+                }
+            }
+
+            BufferPool.ReturnBuffer(rawBytes);
+        }
 
         /// <summary>
         /// Called, preferably in another thread, to receive packets from other endPoints
         /// </summary>
         protected virtual void ReceiveMessages()
         {
+#if NETWORK_DEBUG
+            for (int i = latencyList.Count - 1; i >= 0; i--)
+            {
+                Packet packet = latencyList[i];
+                if (ElapsedTime > packet.time)
+                {
+                    HandleMessage(packet.endPoint, packet.bytes, packet.bytes.Length);
+                    latencyList.RemoveAt(i);
+                }
+            }
+#endif
+
             while (socket.Available > 0)
             {
                 EndPoint endPoint = new IPEndPoint(IPAddress.Any, 0);
@@ -338,117 +489,24 @@ namespace BSNet
                 // Get packets from other endpoints
                 byte[] rawBytes = BufferPool.GetBuffer(RECEIVE_BUFFER_SIZE);
                 int length = socket.ReceiveFrom(rawBytes, ref endPoint);
-                //if (random.Next(100) < 25) return; // DEBUG
 
-                inComingBipS += length * 8;
-
-                // The length is less than the header, certainly malicious
-                if (length < headerSize)
-                {
-                    BufferPool.ReturnBuffer(rawBytes);
+#if NETWORK_DEBUG
+                // Simulate packet loss
+                if (SimulatedPacketLoss > 0 && random.Next(1000) < SimulatedPacketLoss)
                     continue;
-                }
 
-                // Read the buffer and determine CRC
-                using (BSReader reader = new BSReader(rawBytes, length))
+                if (SimulatedPacketLatency > 0)
                 {
-                    if (!reader.SerializeChecksum(ProtocolVersion))
-                        continue;
-
-                    // Read header
-                    byte type = 0;
-                    ushort sequence = 0;
-                    ushort ack = 0;
-                    uint ackBits = 0;
-                    ulong token = 0;
-                    SerializeHeader(reader,
-                        ref type,
-                        ref sequence,
-                        ref ack,
-                        ref ackBits,
-                        ref token);
-                    
-                    // Handle the message
-                    if (type == ConnectionType.CONNECT) // If this endPoint wants to establish connection
-                    {
-                        if (length == RECEIVE_BUFFER_SIZE) // Make sure this message has been padded
-                        {
-                            if (connections.TryGetValue(endPoint, out ClientConnection connection))
-                            {
-                                // Acknowledge this packet
-                                connection.Acknowledge(sequence);
-                            }
-                            else
-                            {
-                                // Add this connection to the list
-                                ulong localToken = Cryptography.GenerateToken();
-                                connection = new ClientConnection(endPoint, ElapsedTime, localToken, token);
-                                connections.Add(endPoint, connection);
-
-                                // Acknowledge this packet
-                                connection.Acknowledge(sequence);
-
-                                // Send a connection message to the sender
-                                byte[] bytes = SendRawMessage(connection, ConnectionType.CONNECT, connection.LocalToken, writer =>
-                                {
-                                    // Pad message to 1024 bytes
-                                    writer.PadToEnd();
-                                });
-                                AddReliableMessage(connection, bytes);
-                            }
-
-                            // If this connection is not authenticated
-                            if (!connection.Authenticated)
-                            {
-                                connection.Authenticate(token, ElapsedTime);
-                                OnConnect((IPEndPoint)endPoint);
-                            }
-                        }
-                    }
-                    else if (connections.TryGetValue(endPoint, out ClientConnection connection))
-                    {
-                        if (type == ConnectionType.DISCONNECT) // If this endPoint wants to disconnect
-                        {
-                            // If this connection is authenticated
-                            if (connection.Authenticated && connection.Authenticate(token, ElapsedTime))
-                            {
-                                connections.Remove(endPoint);
-                                OnDisconnect((IPEndPoint)endPoint);
-                            }
-                        }
-                        else if (connection.Authenticated) // If this endPoint has been authenticated
-                        {
-                            // Compare the tokens
-                            if (connection.Authenticate(token, ElapsedTime))
-                            {
-                                // Remove acknowledged messages
-                                for (int i = 31; i >= 0; i--)
-                                {
-                                    ushort seq = (ushort)(ack - i);
-                                    if (BSUtility.IsAcknowledged(ackBits, ack, seq))
-                                    {
-                                        connection.UpdateRTT(seq, ElapsedTime);
-                                        unsentMessages.Remove(new ConnectionSequence(endPoint, seq));
-                                        // OnMessageAcknowledged(seq);
-                                    }
-                                }
-
-                                // Validate packet and return payload to application
-                                if (!connection.IsAcknowledged(sequence) && type == ConnectionType.MESSAGE)
-                                    OnReceiveMessage((IPEndPoint)endPoint, reader);
-
-                                // Acknowledge this packet
-                                connection.Acknowledge(sequence);
-                            }
-                            else
-                            {
-                                Log($"Mismatching token for {endPoint}", LogLevel.Warning);
-                            }
-                        }
-                    }
+                    Packet packet = new Packet(endPoint, rawBytes, length, ElapsedTime + SimulatedPacketLatency / 1000d);
+                    latencyList.Add(packet);
                 }
-
-                BufferPool.ReturnBuffer(rawBytes);
+                else
+                {
+                    HandleMessage(endPoint, rawBytes, length);
+                }
+#else
+                HandleMessage(endPoint, rawBytes, length);
+#endif
             }
 
             double timeout = ElapsedTime - TIMEOUT;
@@ -476,7 +534,7 @@ namespace BSNet
 
 
             // Resend lost reliable packets
-            var resendMessages = unsentMessages.Where(i => i.Value.timeSent < resendTime).ToArray();
+            var resendMessages = unsentMessages.Where(i => i.Value.time < resendTime).ToArray();
             foreach (var data in resendMessages)
             {
                 EndPoint ep = data.Key.endPoint;
@@ -554,8 +612,10 @@ namespace BSNet
 
         protected virtual void OnNetworkStatistics(int outGoingBipS, int inComingBipS)
         {
-            //Log($"Outgoing bits in the last second: {outGoingBipS / 1000f} Kbits/S");
-            //Log($"Incoming bits in the last second: {inComingBipS / 1000f} Kbits/S");
+            /*foreach (ClientConnection connection in connections.Values)
+                Log(connection.RTT, LogLevel.Info);
+            Log($"Outgoing bits in the last second: {outGoingBipS / 1000f} Kbits/S", LogLevel.Info);
+            Log($"Incoming bits in the last second: {inComingBipS / 1000f} Kbits/S", LogLevel.Info);*/
         }
 
         protected abstract void OnConnect(IPEndPoint endPoint);

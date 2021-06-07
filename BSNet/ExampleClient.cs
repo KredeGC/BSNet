@@ -19,6 +19,11 @@ namespace BSNet.Example
 
             // Send a request to connect
             Connect(peerEndPoint);
+
+#if NETWORK_DEBUG
+            SimulatedPacketLatency = 250;
+            SimulatedPacketLoss = 250;
+#endif
         }
 
         // For error logging
