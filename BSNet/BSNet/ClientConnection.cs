@@ -1,9 +1,12 @@
-﻿namespace BSNet
+﻿using System.Net;
+
+namespace BSNet
 {
     public class ClientConnection
     {
         public const int RTT_BUFFER_SIZE = 256;
 
+        public EndPoint AddressPoint { private set; get; }
         public double RTT { private set; get; }
         public ushort LocalSequence { private set; get; }
         public ushort RemoteSequence { private set; get; }
@@ -18,8 +21,9 @@
 
         private double[] roundTrips = new double[RTT_BUFFER_SIZE];
 
-        public ClientConnection(double time, ulong localToken, ulong remoteToken)
+        public ClientConnection(EndPoint endPoint, double time, ulong localToken, ulong remoteToken)
         {
+            AddressPoint = endPoint;
             LocalSequence = 0;
             RemoteSequence = 0;
             AckBits = 0;
@@ -101,7 +105,7 @@
                 if (shift < 0)
                     shift += 65536 + 1;
 
-                AckBits = (AckBits << 1) + 1; // Add last received
+                AckBits = (AckBits << 1) + 1; // Add old received
                 AckBits <<= shift; // Shift more if necessary
 
                 RemoteSequence = sequence;

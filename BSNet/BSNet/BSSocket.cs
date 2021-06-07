@@ -61,11 +61,12 @@ namespace BSNet
         protected IPEndPoint localEndPoint;
         protected Socket socket;
         protected const int SIO_UDP_CONNRESET = -1744830452;
+        protected bool _disposing;
 
         // P2P Protocol
         protected const int headerSize =
             sizeof(uint) + // CRC32 of version + packet (4 bytes)
-            sizeof(byte) + // ConnectionType (3 bits)
+            sizeof(byte) + // ConnectionType (2 bits)
             sizeof(ushort) + // Sequence of this packet (2 bytes)
             sizeof(ushort) + // Acknowledgement for most recent received packet (2 bytes)
             sizeof(uint) + // Bitfield of acknowledgements before most recent (4 bytes)
@@ -120,8 +121,19 @@ namespace BSNet
 
         protected virtual void Dispose(bool disposing)
         {
-            socket.Close();
-            socket = null;
+            if (!_disposing)
+            {
+                _disposing = true;
+
+                if (disposing)
+                {
+                    foreach (EndPoint endPoint in connections.Keys)
+                        Disconnect(endPoint);
+                }
+
+                socket.Close();
+                socket = null;
+            }
         }
 
         public virtual void Update()
@@ -147,12 +159,12 @@ namespace BSNet
             {
                 ulong localToken = Cryptography.GenerateToken();
 
-                connection = new ClientConnection(ElapsedTime, localToken, 0);
+                connection = new ClientConnection(endPoint, ElapsedTime, localToken, 0);
                 connections.Add(endPoint, connection);
             }
 
             // Send a message with the generated token
-            byte[] rawBytes = SendRawMessage(endPoint, ConnectionType.CONNECT, connection.LocalToken, writer =>
+            byte[] rawBytes = SendRawMessage(connection, ConnectionType.CONNECT, connection.LocalToken, writer =>
             {
                 // Pad message to 1024 bytes
                 writer.PadToEnd();
@@ -169,9 +181,10 @@ namespace BSNet
             if (connections.TryGetValue(endPoint, out ClientConnection connection))
             {
                 // Send an unreliable message with the generated token. We shouldn't wait around
-                byte[] rawBytes = SendRawMessage(endPoint, ConnectionType.DISCONNECT, connection.Token);
+                SendRawMessage(connection, ConnectionType.DISCONNECT, connection.Token);
 
-                connections.Remove(endPoint);
+                if (!_disposing)
+                    connections.Remove(endPoint);
             }
         }
 
@@ -185,7 +198,7 @@ namespace BSNet
             // Check if authenticated
             if (connections.TryGetValue(endPoint, out ClientConnection connection) && connection.Authenticated)
             {
-                SendRawMessage(endPoint, ConnectionType.UNRELIABLE, connection.Token, writer =>
+                SendRawMessage(connection, ConnectionType.MESSAGE, connection.Token, writer =>
                 {
                     action?.Invoke(writer);
                 });
@@ -202,7 +215,7 @@ namespace BSNet
             // Check if authenticated
             if (connections.TryGetValue(endPoint, out ClientConnection connection) && connection.Authenticated)
             {
-                byte[] rawBytes = SendRawMessage(endPoint, ConnectionType.RELIABLE, connection.Token, writer =>
+                byte[] rawBytes = SendRawMessage(connection, ConnectionType.MESSAGE, connection.Token, writer =>
                 {
                     action?.Invoke(writer);
                 });
@@ -220,7 +233,7 @@ namespace BSNet
         {
             if (connections.TryGetValue(endPoint, out ClientConnection connection) && connection.Authenticated)
             {
-                SendRawMessage(endPoint, ConnectionType.HEARTBEAT, connection.Token);
+                SendRawMessage(connection, ConnectionType.HEARTBEAT, connection.Token);
             }
         }
 
@@ -232,27 +245,26 @@ namespace BSNet
         /// <param name="token">The token to send with it</param>
         /// <param name="action">The method to fill the buffer with data</param>
         /// <returns>The bytes that have been sent to the endPoint</returns>
-        protected virtual byte[] SendRawMessage(EndPoint endPoint, byte type, ulong token, Action<IBSStream> action = null)
+        protected virtual byte[] SendRawMessage(ClientConnection connection, byte type, ulong token, Action<IBSStream> action = null)
         {
+            // Increment sequence
+            connection.IncrementSequence(ElapsedTime);
+
+            // Get values for header
+            ushort sequence = connection.LocalSequence;
+            ushort ack = connection.RemoteSequence;
+            uint ackBits = connection.AckBits;
+
             byte[] rawBytes;
             using (BSWriter writer = new BSWriter(headerSize))
             {
-                if (connections.TryGetValue(endPoint, out ClientConnection connection))
-                {
-                    // Increment sequence
-                    connection.IncrementSequence(ElapsedTime);
-
-                    // Writer header
-                    ushort sequence = connection.LocalSequence;
-                    ushort ack = connection.RemoteSequence;
-                    uint ackBits = connection.AckBits;
-                    SerializeHeader(writer,
-                        ref type,
-                        ref sequence,
-                        ref ack,
-                        ref ackBits,
-                        ref token);
-                }
+                // Write header
+                SerializeHeader(writer,
+                    ref type,
+                    ref sequence,
+                    ref ack,
+                    ref ackBits,
+                    ref token);
                 action?.Invoke(writer);
                 writer.SerializeChecksum(ProtocolVersion);
 
@@ -260,18 +272,18 @@ namespace BSNet
             }
 
             if (rawBytes.Length > 1472)
-                throw new Exception("Packet size too big");
+                throw new ArgumentOutOfRangeException("Packet size too big");
 
             try
             {
-                socket.SendTo(rawBytes, rawBytes.Length, SocketFlags.None, endPoint);
+                socket.SendTo(rawBytes, rawBytes.Length, SocketFlags.None, connection.AddressPoint);
             }
             catch (SocketException e)
             {
                 // Suppress warning about ICMP closed ports
                 if (e.ErrorCode != 10054)
                 {
-                    Log($"Network exception trying to receive data from: {endPoint}");
+                    Log($"Network exception trying to receive data from: {connection.AddressPoint}");
                     Log(e.ToString());
                 }
             }
@@ -292,7 +304,7 @@ namespace BSNet
         /// <param name="token"></param>
         protected virtual void SerializeHeader(IBSStream stream, ref byte type, ref ushort sequence, ref ushort ack, ref uint ackBits, ref ulong token)
         {
-            type = stream.SerializeByte(type, 3);
+            type = stream.SerializeByte(type, 2);
             sequence = stream.SerializeUShort(sequence);
             ack = stream.SerializeUShort(ack);
             ackBits = stream.SerializeUInt(ackBits);
@@ -330,14 +342,14 @@ namespace BSNet
                 int length = socket.ReceiveFrom(rawBytes, ref endPoint);
                 //if (random.Next(100) < 25) return; // DEBUG
 
+                inComingBipS += length * 8;
+
                 // The length is less than the header, certainly malicious
                 if (length < headerSize)
                 {
                     BufferPool.ReturnBuffer(rawBytes);
                     continue;
                 }
-
-                inComingBipS += length * 8;
 
                 // Read the buffer and determine CRC
                 using (BSReader reader = new BSReader(rawBytes, length))
@@ -373,14 +385,14 @@ namespace BSNet
                             {
                                 // Add this connection to the list
                                 ulong localToken = Cryptography.GenerateToken();
-                                connection = new ClientConnection(ElapsedTime, localToken, token);
+                                connection = new ClientConnection(endPoint, ElapsedTime, localToken, token);
                                 connections.Add(endPoint, connection);
 
                                 // Acknowledge this packet
                                 connection.Acknowledge(sequence);
 
                                 // Send a connection message to the sender
-                                byte[] bytes = SendRawMessage(endPoint, ConnectionType.CONNECT, connection.LocalToken, writer =>
+                                byte[] bytes = SendRawMessage(connection, ConnectionType.CONNECT, connection.LocalToken, writer =>
                                 {
                                     // Pad message to 1024 bytes
                                     writer.PadToEnd();
@@ -425,7 +437,7 @@ namespace BSNet
                                 }
 
                                 // Validate packet and return payload to application
-                                if (!connection.IsAcknowledged(sequence) && (type == ConnectionType.RELIABLE || type == ConnectionType.UNRELIABLE))
+                                if (!connection.IsAcknowledged(sequence) && type == ConnectionType.MESSAGE)
                                     OnReceiveMessage((IPEndPoint)endPoint, reader);
 
                                 // Acknowledge this packet
@@ -495,11 +507,11 @@ namespace BSNet
                         int bits = reader.TotalBits;
                         byte[] payload = reader.SerializeBytes(bits);
 
-                        // Remove message and clear RTT
+                        // Remove message
                         unsentMessages.Remove(data.Key);
 
                         // Send new message
-                        byte[] newBytes = SendRawMessage(data.Key.endPoint, type, token, writer =>
+                        byte[] newBytes = SendRawMessage(connection, type, token, writer =>
                         {
                             writer.SerializeBytes(bits, payload);
                         });
