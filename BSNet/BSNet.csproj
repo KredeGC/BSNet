@@ -50,6 +50,7 @@
     <Compile Include="BSNet\ClientConnection.cs" />
     <Compile Include="BSNet\ConnectionType.cs" />
     <Compile Include="BSNet\Cryptography.cs" />
+    <Compile Include="BSNet\LogLevel.cs" />
     <Compile Include="BSNet\Quantization\BoundedRange.cs" />
     <Compile Include="BSNet\Quantization\HalfPrecision.cs" />
     <Compile Include="BSNet\Quantization\SmallestThree.cs" />

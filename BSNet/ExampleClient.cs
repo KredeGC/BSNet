@@ -22,15 +22,29 @@ namespace BSNet.Example
         }
 
         // For error logging
-        protected override void Log(object obj)
+        protected override void Log(object obj, LogLevel level)
         {
+            Console.ForegroundColor = ConsoleColor.Gray;
+            Console.Write($"[{DateTime.Now.TimeOfDay}] ");
+            switch (level)
+            {
+                case LogLevel.Info:
+                    Console.ForegroundColor = ConsoleColor.White;
+                    break;
+                case LogLevel.Warning:
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    break;
+                case LogLevel.Error:
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    break;
+            }
             Console.WriteLine(obj);
         }
 
         // Called when a connection has been established with this IPEndPoint
         protected override void OnConnect(IPEndPoint endPoint)
         {
-            Log($"{endPoint.ToString()} connected");
+            Log($"{endPoint.ToString()} connected", LogLevel.Info);
 
             // Send a message to the connected IPEndPoint
             SendMessageReliable(endPoint, writer =>
@@ -42,7 +56,7 @@ namespace BSNet.Example
         // Called when a connection has been lost with this IPEndPoint
         protected override void OnDisconnect(IPEndPoint endPoint)
         {
-            Log($"{endPoint.ToString()} disconnected");
+            Log($"{endPoint.ToString()} disconnected", LogLevel.Info);
         }
 
         // Called when we receive a message from this IPEndPoint
@@ -50,7 +64,7 @@ namespace BSNet.Example
         {
             // Receive the message, "Hello network!", from the other end
             string message = reader.SerializeString(encoding);
-            Log(message);
+            Log(message, LogLevel.Info);
         }
 
         /*protected override void OnNetworkStatistics(int outGoingBipS, int inComingBipS)

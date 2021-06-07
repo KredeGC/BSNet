@@ -169,7 +169,7 @@ namespace BSNet
                 // Pad message to 1024 bytes
                 writer.PadToEnd();
             });
-            AddReliableMessage(endPoint, connection, rawBytes);
+            AddReliableMessage(connection, rawBytes);
         }
 
         /// <summary>
@@ -221,7 +221,7 @@ namespace BSNet
                 });
 
                 // Add message to backlog
-                AddReliableMessage(endPoint, connection, rawBytes);
+                AddReliableMessage(connection, rawBytes);
             }
         }
 
@@ -240,7 +240,6 @@ namespace BSNet
         /// <summary>
         /// Sends a raw message to the given endPoint
         /// </summary>
-        /// <param name="endPoint">The endPoint to send it to</param>
         /// <param name="type">The type of connection to send</param>
         /// <param name="token">The token to send with it</param>
         /// <param name="action">The method to fill the buffer with data</param>
@@ -271,7 +270,7 @@ namespace BSNet
                 rawBytes = writer.ToArray();
             }
 
-            if (rawBytes.Length > 1472)
+            if (rawBytes.Length > 1024)
                 throw new ArgumentOutOfRangeException("Packet size too big");
 
             try
@@ -283,8 +282,8 @@ namespace BSNet
                 // Suppress warning about ICMP closed ports
                 if (e.ErrorCode != 10054)
                 {
-                    Log($"Network exception trying to receive data from: {connection.AddressPoint}");
-                    Log(e.ToString());
+                    Log($"Network exception trying to receive data from {connection.AddressPoint}", LogLevel.Error);
+                    Log(e.ToString(), LogLevel.Error);
                 }
             }
 
@@ -314,14 +313,13 @@ namespace BSNet
         /// <summary>
         /// Add a message to the reliable list, awaiting acknowledgement
         /// </summary>
-        /// <param name="endPoint">The endPoint to send it to</param>
         /// <param name="connection">The connection of this endPoint</param>
         /// <param name="bytes">The payload of the packet</param>
-        protected virtual void AddReliableMessage(EndPoint endPoint, ClientConnection connection, byte[] bytes)
+        protected virtual void AddReliableMessage(ClientConnection connection, byte[] bytes)
         {
             ReliableMessage msg = new ReliableMessage(bytes, ElapsedTime);
 
-            ConnectionSequence connSeq = new ConnectionSequence(endPoint, connection.LocalSequence);
+            ConnectionSequence connSeq = new ConnectionSequence(connection.AddressPoint, connection.LocalSequence);
             if (!unsentMessages.ContainsKey(connSeq))
                 unsentMessages.Add(connSeq, msg);
         }
@@ -397,7 +395,7 @@ namespace BSNet
                                     // Pad message to 1024 bytes
                                     writer.PadToEnd();
                                 });
-                                AddReliableMessage(endPoint, connection, bytes);
+                                AddReliableMessage(connection, bytes);
                             }
 
                             // If this connection is not authenticated
@@ -413,7 +411,7 @@ namespace BSNet
                         if (type == ConnectionType.DISCONNECT) // If this endPoint wants to disconnect
                         {
                             // If this connection is authenticated
-                            if (connection.Authenticate(token, ElapsedTime))
+                            if (connection.Authenticated && connection.Authenticate(token, ElapsedTime))
                             {
                                 connections.Remove(endPoint);
                                 OnDisconnect((IPEndPoint)endPoint);
@@ -445,7 +443,7 @@ namespace BSNet
                             }
                             else
                             {
-                                Log("Tokens differ.... FUCK");
+                                Log($"Mismatching token for {endPoint}", LogLevel.Warning);
                             }
                         }
                     }
@@ -458,7 +456,7 @@ namespace BSNet
             double resendTime = ElapsedTime - TickRate * 32d;
             double beatTime = ElapsedTime;
 
-            // Clean up old endPoints
+            // Set up lists
             lastTimedOut.Clear();
             lastHeartBeats.Clear();
             foreach (var data in connections)
@@ -470,6 +468,7 @@ namespace BSNet
             }
 
 
+            // Clean up old endPoints
             foreach (EndPoint ep in lastTimedOut)
             {
                 connections.Remove(ep);
@@ -517,15 +516,15 @@ namespace BSNet
                         });
 
                         // Add message to backlog
-                        AddReliableMessage(data.Key.endPoint, connection, newBytes);
+                        AddReliableMessage(connection, newBytes);
                     }
 
-                    Log($"Packet {data.Key.sequence} has been resent as {connection.LocalSequence}");
+                    Log($"Packet {data.Key.sequence} to {data.Key.endPoint} has been resent as {connection.LocalSequence}", LogLevel.Warning);
                 }
                 else
                 {
                     // Client has disconnected
-                    Log($"Packet {data.Key.sequence} dropped due to client disconnect");
+                    Log($"Packet {data.Key.sequence} to {data.Key.endPoint} dropped due to client disconnect", LogLevel.Warning);
                     unsentMessages.Remove(data.Key);
                 }
             }
@@ -552,7 +551,7 @@ namespace BSNet
         }
 
 
-        protected abstract void Log(object obj);
+        protected abstract void Log(object obj, LogLevel level);
 
         protected virtual void OnNetworkStatistics(int outGoingBipS, int inComingBipS)
         {
