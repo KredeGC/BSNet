@@ -2,8 +2,8 @@
 {
     public enum LogLevel
     {
-        Info,
-        Warning,
-        Error
+        Info,       // Generic info messages
+        Warning,    // Warnings about potential disconnect, packet losses etc.
+        Error       // Exceptions etc.
     }
 }

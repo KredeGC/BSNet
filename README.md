@@ -53,7 +53,7 @@ public class Client : BSSocket
     }
 
     // For error logging
-    protected override void Log(object obj)
+    protected override void Log(object obj, LogLevel level)
     {
         Console.WriteLine(obj);
     }
@@ -61,7 +61,7 @@ public class Client : BSSocket
     // Called when a connection has been established with this IPEndPoint
     protected override void OnConnect(IPEndPoint endPoint)
     {
-        Log($"{endPoint.ToString()} connected");
+        Log($"{endPoint.ToString()} connected", LogLevel.Info);
 
         // Send a message to the connected IPEndPoint
         SendMessageReliable(endPoint, writer =>
@@ -73,7 +73,7 @@ public class Client : BSSocket
     // Called when a connection has been lost with this IPEndPoint
     protected override void OnDisconnect(IPEndPoint endPoint)
     {
-        Log($"{endPoint.ToString()} disconnected");
+        Log($"{endPoint.ToString()} disconnected", LogLevel.Info);
     }
 	
     // Called when we receive a message from this IPEndPoint
@@ -81,7 +81,7 @@ public class Client : BSSocket
     {
         // Receive the message, "Hello network!", from the other end
         string message = reader.SerializeString(encoding);
-        Log(message);
+        Log(message, LogLevel.Info);
     }
 }
 ```

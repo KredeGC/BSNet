@@ -228,18 +228,17 @@ namespace BSNet
         /// <summary>
         /// Send an acknowledgement back to the given endPoint
         /// </summary>
-        /// <param name="endPoint">The endPoint to send it to</param>
-        protected virtual void SendHeartbeat(EndPoint endPoint)
+        /// <param name="connection">The connection to send it to</param>
+        protected virtual void SendHeartbeat(ClientConnection connection)
         {
-            if (connections.TryGetValue(endPoint, out ClientConnection connection) && connection.Authenticated)
-            {
+            if (connection.Authenticated)
                 SendRawMessage(connection, ConnectionType.HEARTBEAT, connection.Token);
-            }
         }
 
         /// <summary>
         /// Sends a raw message to the given endPoint
         /// </summary>
+        /// <param name="connection">The connection to send it to</param>
         /// <param name="type">The type of connection to send</param>
         /// <param name="token">The token to send with it</param>
         /// <param name="action">The method to fill the buffer with data</param>
@@ -270,7 +269,7 @@ namespace BSNet
                 rawBytes = writer.ToArray();
             }
 
-            if (rawBytes.Length > 1024)
+            if (rawBytes.Length > RECEIVE_BUFFER_SIZE)
                 throw new ArgumentOutOfRangeException("Packet size too big");
 
             try
@@ -280,6 +279,7 @@ namespace BSNet
             catch (SocketException e)
             {
                 // Suppress warning about ICMP closed ports
+                // Idea: Disconnect client if we receive this error? Might interfer with NAT punch-through
                 if (e.ErrorCode != 10054)
                 {
                     Log($"Network exception trying to receive data from {connection.AddressPoint}", LogLevel.Error);
@@ -367,12 +367,11 @@ namespace BSNet
                         ref ack,
                         ref ackBits,
                         ref token);
-
-                    // Check if a connection already exists
+                    
+                    // Handle the message
                     if (type == ConnectionType.CONNECT) // If this endPoint wants to establish connection
                     {
-                        // Make sure this message has been padded
-                        if (length >= RECEIVE_BUFFER_SIZE)
+                        if (length == RECEIVE_BUFFER_SIZE) // Make sure this message has been padded
                         {
                             if (connections.TryGetValue(endPoint, out ClientConnection connection))
                             {
@@ -506,7 +505,7 @@ namespace BSNet
                         int bits = reader.TotalBits;
                         byte[] payload = reader.SerializeBytes(bits);
 
-                        // Remove message
+                        // Remove message from backlog
                         unsentMessages.Remove(data.Key);
 
                         // Send new message
@@ -534,7 +533,7 @@ namespace BSNet
             foreach (EndPoint ep in lastHeartBeats)
             {
                 if (connections.TryGetValue(ep, out ClientConnection connection) && connection.LastSent < beatTime)
-                    SendHeartbeat(ep);
+                    SendHeartbeat(connection);
             }
 
 
