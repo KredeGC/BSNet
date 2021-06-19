@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using BSNet.Stream;
+using BSNet.Datagram;
 
 #if (ENABLE_MONO || ENABLE_IL2CPP)
 using UnityEngine;
@@ -15,47 +16,6 @@ namespace BSNet
 {
     public abstract class BSSocket : IDisposable
     {
-        protected struct ConnectionSequence
-        {
-            public EndPoint endPoint;
-            public ushort sequence;
-
-            public ConnectionSequence(EndPoint endPoint, ushort sequence)
-            {
-                this.endPoint = endPoint;
-                this.sequence = sequence;
-            }
-        }
-
-        protected struct Packet
-        {
-            public EndPoint endPoint;
-            public byte[] bytes;
-            public double time;
-
-            public Packet(EndPoint endPoint, byte[] bytes, int length, double time)
-            {
-                this.endPoint = endPoint;
-                this.bytes = new byte[length];
-                this.time = time;
-
-                Buffer.BlockCopy(bytes, 0, this.bytes, 0, length);
-            }
-
-            public Packet(EndPoint endPoint, byte[] bytes, double time)
-            {
-                this.endPoint = endPoint;
-                this.bytes = new byte[bytes.Length];
-                this.time = time;
-
-                Buffer.BlockCopy(bytes, 0, this.bytes, 0, bytes.Length);
-            }
-        }
-
-        // Constants
-        public const int RECEIVE_BUFFER_SIZE = 1024;
-        public const int TIMEOUT = 10;
-
         // Time
 #if !(ENABLE_MONO || ENABLE_IL2CPP)
         public virtual double ElapsedTime => stopwatch.Elapsed.TotalSeconds;
@@ -212,6 +172,19 @@ namespace BSNet
         }
 
         /// <summary>
+        /// Sends a reliable message to an endPoint
+        /// </summary>
+        /// <param name="endPoint">The endPoint to send it to</param>
+        /// <param name="serializable">The serializable to fill the message</param>
+        public virtual void SendMessageUnreliable(EndPoint endPoint, IBSSerializable serializable)
+        {
+            SendMessageUnreliable(endPoint, writer =>
+            {
+                serializable.Serialize(writer);
+            });
+        }
+
+        /// <summary>
         /// Sends an unreliable message to an endPoint
         /// </summary>
         /// <param name="endPoint">The endPoint to send it to</param>
@@ -226,6 +199,19 @@ namespace BSNet
                     action?.Invoke(writer);
                 });
             }
+        }
+
+        /// <summary>
+        /// Sends a reliable message to an endPoint
+        /// </summary>
+        /// <param name="endPoint">The endPoint to send it to</param>
+        /// <param name="serializable">The serializable to fill the message</param>
+        public virtual void SendMessageReliable(EndPoint endPoint, IBSSerializable serializable)
+        {
+            SendMessageReliable(endPoint, writer =>
+            {
+                serializable.Serialize(writer);
+            });
         }
 
         /// <summary>
@@ -271,28 +257,25 @@ namespace BSNet
             // Increment sequence
             connection.IncrementSequence(ElapsedTime);
 
-            // Get values for header
-            ushort sequence = connection.LocalSequence;
-            ushort ack = connection.RemoteSequence;
-            uint ackBits = connection.AckBits;
-
             byte[] rawBytes;
             using (BSWriter writer = new BSWriter(headerSize))
             {
-                // Write header
-                SerializeHeader(writer,
-                    ref type,
-                    ref sequence,
-                    ref ack,
-                    ref ackBits,
-                    ref token);
+                // Write header data
+                Header header = new Header(type,
+                    connection.LocalSequence,
+                    connection.RemoteSequence,
+                    connection.AckBits,
+                    token);
+                header.Serialize(writer);
+                
+                // Write message data
                 action?.Invoke(writer);
                 writer.SerializeChecksum(ProtocolVersion);
 
                 rawBytes = writer.ToArray();
             }
 
-            if (rawBytes.Length > RECEIVE_BUFFER_SIZE)
+            if (rawBytes.Length > BSUtility.RECEIVE_BUFFER_SIZE)
                 throw new ArgumentOutOfRangeException("Packet size too big");
 
             try
@@ -302,7 +285,7 @@ namespace BSNet
             catch (SocketException e)
             {
                 // Suppress warning about ICMP closed ports
-                // Idea: Disconnect client if we receive this error? Might interfer with NAT punch-through
+                // Idea: Disconnect client if we receive this exception? Might interfer with NAT punch-through
                 if (e.ErrorCode != 10054)
                 {
                     Log($"Network exception trying to receive data from {connection.AddressPoint}", LogLevel.Error);
@@ -313,24 +296,6 @@ namespace BSNet
             outGoingBipS += rawBytes.Length * 8;
 
             return rawBytes;
-        }
-
-        /// <summary>
-        /// Serializes a header from an IBSStream
-        /// </summary>
-        /// <param name="stream"></param>
-        /// <param name="type"></param>
-        /// <param name="sequence"></param>
-        /// <param name="ack"></param>
-        /// <param name="ackBits"></param>
-        /// <param name="token"></param>
-        protected virtual void SerializeHeader(IBSStream stream, ref byte type, ref ushort sequence, ref ushort ack, ref uint ackBits, ref ulong token)
-        {
-            type = stream.SerializeByte(type, 2);
-            sequence = stream.SerializeUShort(sequence);
-            ack = stream.SerializeUShort(ack);
-            ackBits = stream.SerializeUInt(ackBits);
-            token = stream.SerializeULong(token);
         }
 
         /// <summary>
@@ -359,7 +324,7 @@ namespace BSNet
             // The length is less than the header, certainly malicious
             if (length < headerSize)
             {
-                BufferPool.ReturnBuffer(rawBytes);
+                BSPool.ReturnBuffer(rawBytes);
                 return;
             }
 
@@ -369,38 +334,28 @@ namespace BSNet
                 if (!reader.SerializeChecksum(ProtocolVersion))
                     return;
 
-                // Read header
-                byte type = 0;
-                ushort sequence = 0;
-                ushort ack = 0;
-                uint ackBits = 0;
-                ulong token = 0;
-                SerializeHeader(reader,
-                    ref type,
-                    ref sequence,
-                    ref ack,
-                    ref ackBits,
-                    ref token);
+                // Read header data
+                Header header = new Header(reader);
 
                 // Handle the message
-                if (type == ConnectionType.CONNECT) // If this endPoint wants to establish connection
+                if (header.Type == ConnectionType.CONNECT) // If this endPoint wants to establish connection
                 {
-                    if (length == RECEIVE_BUFFER_SIZE) // Make sure this message has been padded
+                    if (length == BSUtility.RECEIVE_BUFFER_SIZE) // Make sure this message has been padded
                     {
                         if (connections.TryGetValue(endPoint, out ClientConnection connection))
                         {
                             // Acknowledge this packet
-                            connection.Acknowledge(sequence);
+                            connection.Acknowledge(header.Sequence);
                         }
                         else
                         {
                             // Add this connection to the list
                             ulong localToken = Cryptography.GenerateToken();
-                            connection = new ClientConnection(endPoint, ElapsedTime, localToken, token);
+                            connection = new ClientConnection(endPoint, ElapsedTime, localToken, header.Token);
                             connections.Add(endPoint, connection);
 
                             // Acknowledge this packet
-                            connection.Acknowledge(sequence);
+                            connection.Acknowledge(header.Sequence);
 
                             // Send a connection message to the sender
                             byte[] bytes = SendRawMessage(connection, ConnectionType.CONNECT, connection.LocalToken, writer =>
@@ -414,17 +369,17 @@ namespace BSNet
                         // If this connection is not authenticated
                         if (!connection.Authenticated)
                         {
-                            connection.Authenticate(token, ElapsedTime);
+                            connection.Authenticate(header.Token, ElapsedTime);
                             OnConnect((IPEndPoint)endPoint);
                         }
                     }
                 }
                 else if (connections.TryGetValue(endPoint, out ClientConnection connection))
                 {
-                    if (type == ConnectionType.DISCONNECT) // If this endPoint wants to disconnect
+                    if (header.Type == ConnectionType.DISCONNECT) // If this endPoint wants to disconnect
                     {
                         // If this connection is authenticated
-                        if (connection.Authenticated && connection.Authenticate(token, ElapsedTime))
+                        if (connection.Authenticated && connection.Authenticate(header.Token, ElapsedTime))
                         {
                             connections.Remove(endPoint);
                             OnDisconnect((IPEndPoint)endPoint);
@@ -433,13 +388,13 @@ namespace BSNet
                     else if (connection.Authenticated) // If this endPoint has been authenticated
                     {
                         // Compare the tokens
-                        if (connection.Authenticate(token, ElapsedTime))
+                        if (connection.Authenticate(header.Token, ElapsedTime))
                         {
                             // Remove acknowledged messages
                             for (int i = 31; i >= 0; i--)
                             {
-                                ushort seq = (ushort)(ack - i);
-                                if (BSUtility.IsAcknowledged(ackBits, ack, seq))
+                                ushort seq = (ushort)(header.Ack - i);
+                                if (BSUtility.IsAcknowledged(header.AckBits, header.Ack, seq))
                                 {
                                     connection.UpdateRTT(seq, ElapsedTime);
                                     unsentMessages.Remove(new ConnectionSequence(endPoint, seq));
@@ -448,11 +403,11 @@ namespace BSNet
                             }
 
                             // Validate packet and return payload to application
-                            if (!connection.IsAcknowledged(sequence) && type == ConnectionType.MESSAGE)
+                            if (!connection.IsAcknowledged(header.Sequence) && header.Type == ConnectionType.MESSAGE)
                                 OnReceiveMessage((IPEndPoint)endPoint, reader);
 
                             // Acknowledge this packet
-                            connection.Acknowledge(sequence);
+                            connection.Acknowledge(header.Sequence);
                         }
                         else
                         {
@@ -462,7 +417,7 @@ namespace BSNet
                 }
             }
 
-            BufferPool.ReturnBuffer(rawBytes);
+            BSPool.ReturnBuffer(rawBytes);
         }
 
         /// <summary>
@@ -474,9 +429,9 @@ namespace BSNet
             for (int i = latencyList.Count - 1; i >= 0; i--)
             {
                 Packet packet = latencyList[i];
-                if (ElapsedTime > packet.time)
+                if (ElapsedTime > packet.Time)
                 {
-                    HandleMessage(packet.endPoint, packet.bytes, packet.bytes.Length);
+                    HandleMessage(packet.AddressPoint, packet.Bytes, packet.Bytes.Length);
                     latencyList.RemoveAt(i);
                 }
             }
@@ -487,7 +442,7 @@ namespace BSNet
                 EndPoint endPoint = new IPEndPoint(IPAddress.Any, 0);
 
                 // Get packets from other endpoints
-                byte[] rawBytes = BufferPool.GetBuffer(RECEIVE_BUFFER_SIZE);
+                byte[] rawBytes = BSPool.GetBuffer(BSUtility.RECEIVE_BUFFER_SIZE);
                 int length = socket.ReceiveFrom(rawBytes, ref endPoint);
 
 #if NETWORK_DEBUG
@@ -509,7 +464,7 @@ namespace BSNet
 #endif
             }
 
-            double timeout = ElapsedTime - TIMEOUT;
+            double timeout = ElapsedTime - BSUtility.TIMEOUT;
             double resendTime = ElapsedTime - TickRate * 32d;
             double beatTime = ElapsedTime;
 
@@ -534,30 +489,20 @@ namespace BSNet
 
 
             // Resend lost reliable packets
-            var resendMessages = unsentMessages.Where(i => i.Value.time < resendTime).ToArray();
+            var resendMessages = unsentMessages.Where(i => i.Value.Time < resendTime).ToArray();
             foreach (var data in resendMessages)
             {
-                EndPoint ep = data.Key.endPoint;
+                EndPoint ep = data.Key.EndPoint;
                 if (connections.TryGetValue(ep, out ClientConnection connection))
                 {
                     // Get CRC
-                    byte[] rawBytes = unsentMessages[data.Key].bytes;
+                    byte[] rawBytes = unsentMessages[data.Key].Bytes;
                     using (BSReader reader = new BSReader(rawBytes))
                     {
                         reader.SerializeChecksum(ProtocolVersion);
 
-                        // Get header
-                        byte type = 0;
-                        ushort sequence = 0;
-                        ushort ack = 0;
-                        uint ackBits = 0;
-                        ulong token = 0;
-                        SerializeHeader(reader,
-                            ref type,
-                            ref sequence,
-                            ref ack,
-                            ref ackBits,
-                            ref token);
+                        // Read header data
+                        Header header = new Header(reader);
 
                         // Get payload
                         int bits = reader.TotalBits;
@@ -567,7 +512,7 @@ namespace BSNet
                         unsentMessages.Remove(data.Key);
 
                         // Send new message
-                        byte[] newBytes = SendRawMessage(connection, type, token, writer =>
+                        byte[] newBytes = SendRawMessage(connection, header.Type, header.Token, writer =>
                         {
                             writer.SerializeBytes(bits, payload);
                         });
@@ -576,12 +521,12 @@ namespace BSNet
                         AddReliableMessage(connection, newBytes);
                     }
 
-                    Log($"Packet {data.Key.sequence} to {data.Key.endPoint} has been resent as {connection.LocalSequence}", LogLevel.Warning);
+                    Log($"Packet {data.Key.Sequence} to {data.Key.EndPoint} has been resent as {connection.LocalSequence}", LogLevel.Warning);
                 }
                 else
                 {
                     // Client has disconnected
-                    Log($"Packet {data.Key.sequence} to {data.Key.endPoint} dropped due to client disconnect", LogLevel.Warning);
+                    Log($"Packet {data.Key.Sequence} to {data.Key.EndPoint} dropped due to client disconnect", LogLevel.Warning);
                     unsentMessages.Remove(data.Key);
                 }
             }

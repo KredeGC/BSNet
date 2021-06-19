@@ -32,15 +32,9 @@ This is an example of a simple P2P architecture, where both ends connect to each
 ```csharp
 public class Client : BSSocket
 {
+    public override byte[] ProtocolVersion => new byte[] { 0x00, 0x00, 0x00, 0x01 };
+    
     protected Encoding encoding = new ASCIIEncoding();
-
-    protected override byte[] ProtocolVersion
-    {
-        get
-        {
-            return new byte[] { 0x00, 0x00, 0x00, 0x01 };
-        }
-    }
     
     public Client(int localPort, string peerIP, int peerPort) : base(localPort)
     {

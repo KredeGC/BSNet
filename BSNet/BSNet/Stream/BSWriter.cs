@@ -48,21 +48,21 @@ namespace BSNet.Stream
         {
             byte[] data = ToArray();
 
-            byte[] combinedBytes = BufferPool.GetBuffer(version.Length + data.Length);
+            byte[] combinedBytes = BSPool.GetBuffer(version.Length + data.Length);
             Buffer.BlockCopy(version, 0, combinedBytes, 0, version.Length);
             Buffer.BlockCopy(data, 0, combinedBytes, version.Length, data.Length);
 
             byte[] crcBytes = Cryptography.CRC32Bytes(combinedBytes);
 
-            byte[] headerBytes = BufferPool.GetBuffer(crcBytes.Length + data.Length);
+            byte[] headerBytes = BSPool.GetBuffer(crcBytes.Length + data.Length);
             Buffer.BlockCopy(crcBytes, 0, headerBytes, 0, crcBytes.Length);
             Buffer.BlockCopy(data, 0, headerBytes, crcBytes.Length, data.Length);
 
             internalStream = headerBytes.ToList();
 
-            BufferPool.ReturnBuffer(combinedBytes);
-            BufferPool.ReturnBuffer(crcBytes);
-            BufferPool.ReturnBuffer(headerBytes);
+            BSPool.ReturnBuffer(combinedBytes);
+            BSPool.ReturnBuffer(crcBytes);
+            BSPool.ReturnBuffer(headerBytes);
 
             return true;
         }
@@ -70,8 +70,8 @@ namespace BSNet.Stream
         // Padding
         public byte[] PadToEnd()
         {
-            int remaining = (BSSocket.RECEIVE_BUFFER_SIZE - 4) * BSUtility.BYTE_BITS - TotalBits;
-            byte[] padding = new byte[BSSocket.RECEIVE_BUFFER_SIZE];
+            int remaining = (BSUtility.RECEIVE_BUFFER_SIZE - 4) * BSUtility.BYTE_BITS - TotalBits;
+            byte[] padding = new byte[BSUtility.RECEIVE_BUFFER_SIZE];
             SerializeBytes(remaining, padding);
             return padding;
         }
@@ -245,10 +245,10 @@ namespace BSNet.Stream
         // Bytes
         public byte[] SerializeBytes(int bitCount, byte[] data = null)
         {
-            byte[] raw = BufferPool.GetBuffer(data.Length);
+            byte[] raw = BSPool.GetBuffer(data.Length);
             Buffer.BlockCopy(data, 0, raw, 0, data.Length);
             Write(bitCount, raw, 0, raw.Length);
-            BufferPool.ReturnBuffer(raw);
+            BSPool.ReturnBuffer(raw);
             return raw;
         }
 

@@ -8,7 +8,10 @@ namespace BSNet
 {
     internal static class BSUtility
     {
+        public const int TIMEOUT = 10;
         public const int BYTE_BITS = 8;
+        public const int RTT_BUFFER_SIZE = 256;
+        public const int RECEIVE_BUFFER_SIZE = 1024;
 
         private static readonly byte[] sBitMasks;
 

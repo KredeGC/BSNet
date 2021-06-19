@@ -4,8 +4,6 @@ namespace BSNet
 {
     public class ClientConnection
     {
-        public const int RTT_BUFFER_SIZE = 256;
-
         public EndPoint AddressPoint { private set; get; }
         public double RTT { private set; get; }
         public ushort LocalSequence { private set; get; }
@@ -19,7 +17,7 @@ namespace BSNet
         public bool Authenticated { private set; get; }
         public ulong Token { get { return LocalToken ^ RemoteToken; } }
 
-        private double[] roundTrips = new double[RTT_BUFFER_SIZE];
+        private double[] roundTrips = new double[BSUtility.RTT_BUFFER_SIZE];
 
         public ClientConnection(EndPoint endPoint, double time, ulong localToken, ulong remoteToken)
         {
@@ -43,7 +41,7 @@ namespace BSNet
         {
             LocalSequence++;
             LastSent = time;
-            roundTrips[LocalSequence % RTT_BUFFER_SIZE] = time;
+            roundTrips[LocalSequence % BSUtility.RTT_BUFFER_SIZE] = time;
         }
 
         /// <summary>
@@ -79,11 +77,11 @@ namespace BSNet
         /// <param name="time">The current time, to compare</param>
         public void UpdateRTT(ushort sequence, double time)
         {
-            if (roundTrips[sequence % RTT_BUFFER_SIZE] > 0)
+            if (roundTrips[sequence % BSUtility.RTT_BUFFER_SIZE] > 0)
             {
-                double rtt = time - roundTrips[sequence % RTT_BUFFER_SIZE];
+                double rtt = time - roundTrips[sequence % BSUtility.RTT_BUFFER_SIZE];
                 RTT = RTT * 0.9d + rtt * 0.1d;
-                roundTrips[sequence % RTT_BUFFER_SIZE] = 0;
+                roundTrips[sequence % BSUtility.RTT_BUFFER_SIZE] = 0;
             }
         }
 

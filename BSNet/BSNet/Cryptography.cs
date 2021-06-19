@@ -12,6 +12,7 @@ namespace BSNet
 
         static Cryptography()
         {
+            // Initiate the table for checksums
             ChecksumTable = new uint[0x100];
 
             for (uint index = 0; index < 0x100; ++index)
@@ -23,6 +24,11 @@ namespace BSNet
             }
         }
 
+        /// <summary>
+        /// Calculate the checksum of a given byte array
+        /// </summary>
+        /// <param name="bytes">The byte array to calculate a checksum for</param>
+        /// <returns>The checksum in uint format</returns>
         public static uint CRC32UInt(IEnumerable<byte> bytes)
         {
             uint result = 0xFFFFFFFF;
@@ -33,6 +39,11 @@ namespace BSNet
             return ~result;
         }
 
+        /// <summary>
+        /// Calculate the checksum of a given byte array
+        /// </summary>
+        /// <param name="bytes">The byte array to calculate a checksum for</param>
+        /// <returns>The checksum in byte array format</returns>
         public static byte[] CRC32Bytes(IEnumerable<byte> bytes)
         {
             uint result = 0xFFFFFFFF;
@@ -41,7 +52,7 @@ namespace BSNet
                 result = ChecksumTable[(result & 0xFF) ^ current] ^ (result >> 8);
 
             result = ~result;
-            byte[] crc = BufferPool.GetBuffer(4);
+            byte[] crc = BSPool.GetBuffer(4);
             crc[0] = (byte)(result >> 24);
             crc[1] = (byte)(result >> 16);
             crc[2] = (byte)(result >> 8);
@@ -49,11 +60,19 @@ namespace BSNet
             return crc;
         }
 
+        /// <summary>
+        /// Populate an array of cryptographically secure bytes
+        /// </summary>
+        /// <param name="bytes">The byte array to populate</param>
         public static void GetBytes(byte[] bytes) => rng.GetBytes(bytes);
 
+        /// <summary>
+        /// Generate a cryptographically secure token
+        /// </summary>
+        /// <returns>The generated token</returns>
         public static ulong GenerateToken()
         {
-            byte[] tokenBytes = BufferPool.GetBuffer(8);
+            byte[] tokenBytes = BSPool.GetBuffer(8);
             GetBytes(tokenBytes);
 
             ulong token = (ulong)tokenBytes[0] << 56 |
@@ -65,7 +84,7 @@ namespace BSNet
                 (ulong)tokenBytes[6] << 8 |
                 (ulong)tokenBytes[7];
 
-            BufferPool.ReturnBuffer(tokenBytes);
+            BSPool.ReturnBuffer(tokenBytes);
 
             return token;
         }

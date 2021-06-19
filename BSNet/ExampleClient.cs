@@ -51,11 +51,11 @@ namespace BSNet.Example
         {
             Log($"{endPoint.ToString()} connected", LogLevel.Info);
 
-            // Send a message to the connected IPEndPoint
-            SendMessageReliable(endPoint, writer =>
-            {
-                writer.SerializeString(encoding, "Hello network!");
-            });
+            // Create a packet
+            ExamplePacket serializable = new ExamplePacket($"Hello network to {endPoint}!");
+
+            // Serialize the message and send it to the connected IPEndPoint
+            SendMessageReliable(endPoint, serializable);
         }
 
         // Called when a connection has been lost with this IPEndPoint
@@ -67,9 +67,13 @@ namespace BSNet.Example
         // Called when we receive a message from this IPEndPoint
         protected override void OnReceiveMessage(IPEndPoint endPoint, IBSStream reader)
         {
-            // Receive the message, "Hello network!", from the other end
-            string message = reader.SerializeString(encoding);
-            Log(message, LogLevel.Info);
+            // Create an empty message
+            ExamplePacket emptySerializable = new ExamplePacket();
+
+            // Deserialize the message
+            emptySerializable.Serialize(reader);
+
+            Log(emptySerializable.TestString, LogLevel.Info);
         }
 
         /*protected override void OnNetworkStatistics(int outGoingBipS, int inComingBipS)

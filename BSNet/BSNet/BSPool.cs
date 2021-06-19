@@ -5,7 +5,7 @@ namespace BSNet
     /// <summary>
     /// Helper methods for allocating temporary buffers
     /// </summary>
-    public static class BufferPool
+    public static class BSPool
     {
         private static Dictionary<int, Queue<byte[]>> bufferPool = new Dictionary<int, Queue<byte[]>>();
 
