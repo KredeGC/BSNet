@@ -14,6 +14,14 @@ namespace BSNet.Datagram
 
         private Packet() { }
 
+        /// <summary>
+        /// Retrieves a packet from the pool, or creates a new if none exist
+        /// </summary>
+        /// <param name="endPoint">The endPoint that sent this packet</param>
+        /// <param name="bytes">The data in the packet</param>
+        /// <param name="length">The size of the packet</param>
+        /// <param name="time">The time this packet was received/sent</param>
+        /// <returns>A new packet</returns>
         public static Packet GetPacket(EndPoint endPoint, byte[] bytes, int length, double time)
         {
             lock (packetPool)
@@ -33,6 +41,13 @@ namespace BSNet.Datagram
             }
         }
 
+        /// <summary>
+        /// Retrieves a packet from the pool, or creates a new if none exist
+        /// </summary>
+        /// <param name="endPoint">The endPoint that sent this packet</param>
+        /// <param name="bytes">The data in the packet</param>
+        /// <param name="time">The time this packet was received/sent</param>
+        /// <returns>A new packet</returns>
         public static Packet GetPacket(EndPoint endPoint, byte[] bytes, double time)
         {
             lock (packetPool)

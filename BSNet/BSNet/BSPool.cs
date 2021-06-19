@@ -1,6 +1,4 @@
-﻿using BSNet.Datagram;
-using BSNet.Stream;
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 namespace BSNet
@@ -39,7 +37,7 @@ namespace BSNet
                 if (!bufferPool.ContainsKey(buffer.Length))
                     bufferPool.Add(buffer.Length, new Queue<byte[]>());
 
-                System.Array.Clear(buffer, 0, buffer.Length);
+                Array.Clear(buffer, 0, buffer.Length);
                 bufferPool[buffer.Length].Enqueue(buffer);
             }
         }

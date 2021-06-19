@@ -132,7 +132,7 @@ namespace BSNet.Stream
                     return false;
                 }
             }
-
+            
             BSPool.ReturnBuffer(internalStream);
 
             internalStream = data;

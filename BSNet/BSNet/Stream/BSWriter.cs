@@ -48,7 +48,7 @@ namespace BSNet.Stream
         /// </summary>
         /// <param name="length">The initial capacity</param>
         /// <returns>A new writer</returns>
-        public static BSWriter GetWriter(int length)
+        public static BSWriter GetWriter(int length = 0)
         {
             lock (writerPool)
             {

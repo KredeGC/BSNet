@@ -422,8 +422,6 @@ namespace BSNet
                     }
                 }
             }
-
-            BSPool.ReturnBuffer(rawBytes);
         }
 
         /// <summary>

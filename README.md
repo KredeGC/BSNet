@@ -85,7 +85,7 @@ The readers and writers have built-in functionality for packing bits as tight as
 They can also quantize floats, halfs, Vectors and Quaternions, to keep the bits low.
 ```csharp
 // Create a new BSWriter
-BSWriter writer = new BSWriter();
+BSWriter writer = BSWriter.GetWriter();
 
 // Create a new BoundedRange, with a minimum value of 0, a maximum of 1 and 0.01 in precision
 // This range will crunch a float into just 7 bits
@@ -101,10 +101,13 @@ Console.WriteLine($"Total bits used: {writer.TotalBits}"); // Prints 14
 Console.WriteLine($"Total length of byte array: {bytes.Length}"); // Prints 2
 
 // Create a new BSReader from the byte array
-BSReader reader = new BSReader(bytes);
+BSReader reader = BSReader.GetReader(bytes);
 
 // Read the 2 floats
 float firstFloat = reader.SerializeFloat(range);
 float secondFloat = reader.SerializeFloat(range);
 Console.WriteLine($"Floats read: {firstFloat}, {secondFloat}"); // Prints 0.23 and 0.55
+
+writer.Dispose();
+reader.Dispose();
 ```
