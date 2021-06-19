@@ -2,6 +2,7 @@
 using System.Net;
 using System.Text;
 using BSNet.Quantization;
+using System.Collections.Generic;
 
 #if !(ENABLE_MONO || ENABLE_IL2CPP)
 using System.Numerics;
@@ -13,6 +14,8 @@ namespace BSNet.Stream
 {
     public class BSReader : IBSStream, IDisposable
     {
+        private static Queue<BSReader> readerPool = new Queue<BSReader>();
+
         public bool Writing { get { return false; } }
         public bool Reading { get { return true; } }
 
@@ -28,13 +31,11 @@ namespace BSNet.Stream
         private int bytePos = 0;
         private int bitPos = 1;
 
-        public BSReader(byte[] byteStream, int length)
+        private BSReader(byte[] byteStream, int length)
         {
             internalStream = BSPool.GetBuffer(length);
             Buffer.BlockCopy(byteStream, 0, internalStream, 0, length);
         }
-
-        public BSReader(byte[] byteStream) : this(byteStream, byteStream.Length) { }
 
         ~BSReader()
         {
@@ -49,7 +50,58 @@ namespace BSNet.Stream
 
         protected virtual void Dispose(bool disposing)
         {
-            BSPool.ReturnBuffer(internalStream);
+            ReturnReader(this);
+        }
+
+        /// <summary>
+        /// Retrieves a reader from the pool, or creates a new if none exist
+        /// </summary>
+        /// <param name="byteStream">The bytes to read from</param>
+        /// <returns>A new reader</returns>
+        public static BSReader GetReader(byte[] byteStream)
+        {
+            return GetReader(byteStream, byteStream.Length);
+        }
+
+        /// <summary>
+        /// Retrieves a reader from the pool, or creates a new if none exist
+        /// </summary>
+        /// <param name="byteStream">The bytestream to read from</param>
+        /// <param name="length">The length of the bytes</param>
+        /// <returns>A new reader</returns>
+        public static BSReader GetReader(byte[] byteStream, int length)
+        {
+            lock (readerPool)
+            {
+                BSReader reader;
+                if (readerPool.Count > 0)
+                {
+                    reader = readerPool.Dequeue();
+                    BSPool.ReturnBuffer(reader.internalStream);
+                    reader.internalStream = BSPool.GetBuffer(length);
+                    Buffer.BlockCopy(byteStream, 0, reader.internalStream, 0, length);
+                }
+                else
+                {
+                    reader = new BSReader(byteStream, length);
+                }
+
+                return reader;
+            }
+        }
+
+        /// <summary>
+        /// Returns the given reader into the pool for later use
+        /// </summary>
+        /// <param name="reader">The reader to return</param>
+        public static void ReturnReader(BSReader reader)
+        {
+            lock (readerPool)
+            {
+                reader.bytePos = 0;
+                reader.bitPos = 1;
+                readerPool.Enqueue(reader);
+            }
         }
 
 

@@ -258,16 +258,15 @@ namespace BSNet
             connection.IncrementSequence(ElapsedTime);
 
             byte[] rawBytes;
-            using (BSWriter writer = new BSWriter(headerSize))
+            using (BSWriter writer = BSWriter.GetWriter(headerSize))
             {
                 // Write header data
-                Header header = new Header(type,
-                    connection.LocalSequence,
-                    connection.RemoteSequence,
-                    connection.AckBits,
-                    token);
-                header.Serialize(writer);
-                
+                using (Header header = Header.GetHeader(type, connection.LocalSequence,
+                    connection.RemoteSequence, connection.AckBits, token))
+                {
+                    header.Serialize(writer);
+                }
+
                 // Write message data
                 action?.Invoke(writer);
                 writer.SerializeChecksum(ProtocolVersion);
@@ -305,7 +304,8 @@ namespace BSNet
         /// <param name="bytes">The payload of the packet</param>
         protected virtual void AddReliableMessage(ClientConnection connection, byte[] bytes)
         {
-            Packet msg = new Packet(connection.AddressPoint, bytes, ElapsedTime);
+            Packet msg = Packet.GetPacket(connection.AddressPoint, bytes, ElapsedTime);
+            //Packet msg = new Packet(connection.AddressPoint, bytes, ElapsedTime);
 
             ConnectionSequence connSeq = new ConnectionSequence(connection.AddressPoint, connection.LocalSequence);
             if (!unsentMessages.ContainsKey(connSeq))
@@ -329,89 +329,95 @@ namespace BSNet
             }
 
             // Read the buffer and determine CRC
-            using (BSReader reader = new BSReader(rawBytes, length))
+            using (BSReader reader = BSReader.GetReader(rawBytes, length))
             {
                 if (!reader.SerializeChecksum(ProtocolVersion))
                     return;
 
                 // Read header data
-                Header header = new Header(reader);
-
-                // Handle the message
-                if (header.Type == ConnectionType.CONNECT) // If this endPoint wants to establish connection
+                using (Header header = Header.GetHeader(reader))
                 {
-                    if (length == BSUtility.RECEIVE_BUFFER_SIZE) // Make sure this message has been padded
+                    // Handle the message
+                    if (header.Type == ConnectionType.CONNECT) // If this endPoint wants to establish connection
                     {
-                        if (connections.TryGetValue(endPoint, out ClientConnection connection))
+                        if (length == BSUtility.RECEIVE_BUFFER_SIZE) // Make sure this message has been padded
                         {
-                            // Acknowledge this packet
-                            connection.Acknowledge(header.Sequence);
-                        }
-                        else
-                        {
-                            // Add this connection to the list
-                            ulong localToken = Cryptography.GenerateToken();
-                            connection = new ClientConnection(endPoint, ElapsedTime, localToken, header.Token);
-                            connections.Add(endPoint, connection);
-
-                            // Acknowledge this packet
-                            connection.Acknowledge(header.Sequence);
-
-                            // Send a connection message to the sender
-                            byte[] bytes = SendRawMessage(connection, ConnectionType.CONNECT, connection.LocalToken, writer =>
+                            if (connections.TryGetValue(endPoint, out ClientConnection connection))
                             {
-                                // Pad message to 1024 bytes
-                                writer.PadToEnd();
-                            });
-                            AddReliableMessage(connection, bytes);
-                        }
-
-                        // If this connection is not authenticated
-                        if (!connection.Authenticated)
-                        {
-                            connection.Authenticate(header.Token, ElapsedTime);
-                            OnConnect((IPEndPoint)endPoint);
-                        }
-                    }
-                }
-                else if (connections.TryGetValue(endPoint, out ClientConnection connection))
-                {
-                    if (header.Type == ConnectionType.DISCONNECT) // If this endPoint wants to disconnect
-                    {
-                        // If this connection is authenticated
-                        if (connection.Authenticated && connection.Authenticate(header.Token, ElapsedTime))
-                        {
-                            connections.Remove(endPoint);
-                            OnDisconnect((IPEndPoint)endPoint);
-                        }
-                    }
-                    else if (connection.Authenticated) // If this endPoint has been authenticated
-                    {
-                        // Compare the tokens
-                        if (connection.Authenticate(header.Token, ElapsedTime))
-                        {
-                            // Remove acknowledged messages
-                            for (int i = 31; i >= 0; i--)
+                                // Acknowledge this packet
+                                connection.Acknowledge(header.Sequence);
+                            }
+                            else
                             {
-                                ushort seq = (ushort)(header.Ack - i);
-                                if (BSUtility.IsAcknowledged(header.AckBits, header.Ack, seq))
+                                // Add this connection to the list
+                                ulong localToken = Cryptography.GenerateToken();
+                                connection = new ClientConnection(endPoint, ElapsedTime, localToken, header.Token);
+                                connections.Add(endPoint, connection);
+
+                                // Acknowledge this packet
+                                connection.Acknowledge(header.Sequence);
+
+                                // Send a connection message to the sender
+                                byte[] bytes = SendRawMessage(connection, ConnectionType.CONNECT, connection.LocalToken, writer =>
                                 {
-                                    connection.UpdateRTT(seq, ElapsedTime);
-                                    unsentMessages.Remove(new ConnectionSequence(endPoint, seq));
-                                    // OnMessageAcknowledged(seq);
-                                }
+                                    // Pad message to 1024 bytes
+                                    writer.PadToEnd();
+                                });
+                                AddReliableMessage(connection, bytes);
                             }
 
-                            // Validate packet and return payload to application
-                            if (!connection.IsAcknowledged(header.Sequence) && header.Type == ConnectionType.MESSAGE)
-                                OnReceiveMessage((IPEndPoint)endPoint, reader);
-
-                            // Acknowledge this packet
-                            connection.Acknowledge(header.Sequence);
+                            // If this connection is not authenticated
+                            if (!connection.Authenticated)
+                            {
+                                connection.Authenticate(header.Token, ElapsedTime);
+                                OnConnect((IPEndPoint)endPoint);
+                            }
                         }
-                        else
+                    }
+                    else if (connections.TryGetValue(endPoint, out ClientConnection connection))
+                    {
+                        if (header.Type == ConnectionType.DISCONNECT) // If this endPoint wants to disconnect
                         {
-                            Log($"Mismatching token for {endPoint}", LogLevel.Warning);
+                            // If this connection is authenticated
+                            if (connection.Authenticated && connection.Authenticate(header.Token, ElapsedTime))
+                            {
+                                connections.Remove(endPoint);
+                                OnDisconnect((IPEndPoint)endPoint);
+                            }
+                        }
+                        else if (connection.Authenticated) // If this endPoint has been authenticated
+                        {
+                            // Compare the tokens
+                            if (connection.Authenticate(header.Token, ElapsedTime))
+                            {
+                                // Remove acknowledged messages
+                                for (int i = 31; i >= 0; i--)
+                                {
+                                    ushort seq = (ushort)(header.Ack - i);
+                                    if (BSUtility.IsAcknowledged(header.AckBits, header.Ack, seq))
+                                    {
+                                        connection.UpdateRTT(seq, ElapsedTime);
+                                        ConnectionSequence conSeq = new ConnectionSequence(endPoint, seq);
+                                        if (unsentMessages.TryGetValue(conSeq, out Packet packet))
+                                        {
+                                            Packet.ReturnPacket(packet);
+                                            unsentMessages.Remove(new ConnectionSequence(endPoint, seq));
+                                        }
+                                        // OnMessageAcknowledged(seq);
+                                    }
+                                }
+
+                                // Validate packet and return payload to application
+                                if (!connection.IsAcknowledged(header.Sequence) && header.Type == ConnectionType.MESSAGE)
+                                    OnReceiveMessage((IPEndPoint)endPoint, reader);
+
+                                // Acknowledge this packet
+                                connection.Acknowledge(header.Sequence);
+                            }
+                            else
+                            {
+                                Log($"Mismatching token for {endPoint}", LogLevel.Warning);
+                            }
                         }
                     }
                 }
@@ -433,6 +439,7 @@ namespace BSNet
                 {
                     HandleMessage(packet.AddressPoint, packet.Bytes, packet.Bytes.Length);
                     latencyList.RemoveAt(i);
+                    Packet.ReturnPacket(packet);
                 }
             }
 #endif
@@ -452,7 +459,7 @@ namespace BSNet
 
                 if (SimulatedPacketLatency > 0)
                 {
-                    Packet packet = new Packet(endPoint, rawBytes, length, ElapsedTime + SimulatedPacketLatency / 1000d);
+                    Packet packet = Packet.GetPacket(endPoint, rawBytes, length, ElapsedTime + SimulatedPacketLatency / 1000d);
                     latencyList.Add(packet);
                 }
                 else
@@ -497,28 +504,30 @@ namespace BSNet
                 {
                     // Get CRC
                     byte[] rawBytes = unsentMessages[data.Key].Bytes;
-                    using (BSReader reader = new BSReader(rawBytes))
+                    using (BSReader reader = BSReader.GetReader(rawBytes))
                     {
                         reader.SerializeChecksum(ProtocolVersion);
 
                         // Read header data
-                        Header header = new Header(reader);
-
-                        // Get payload
-                        int bits = reader.TotalBits;
-                        byte[] payload = reader.SerializeBytes(bits);
-
-                        // Remove message from backlog
-                        unsentMessages.Remove(data.Key);
-
-                        // Send new message
-                        byte[] newBytes = SendRawMessage(connection, header.Type, header.Token, writer =>
+                        using (Header header = Header.GetHeader(reader))
                         {
-                            writer.SerializeBytes(bits, payload);
-                        });
+                            // Get payload
+                            int bits = reader.TotalBits;
+                            byte[] payload = reader.SerializeBytes(bits);
 
-                        // Add message to backlog
-                        AddReliableMessage(connection, newBytes);
+                            // Remove message from backlog
+                            Packet.ReturnPacket(data.Value);
+                            unsentMessages.Remove(data.Key);
+
+                            // Send new message
+                            byte[] newBytes = SendRawMessage(connection, header.Type, header.Token, writer =>
+                            {
+                                writer.SerializeBytes(bits, payload);
+                            });
+
+                            // Add message to backlog
+                            AddReliableMessage(connection, newBytes);
+                        }
                     }
 
                     Log($"Packet {data.Key.Sequence} to {data.Key.EndPoint} has been resent as {connection.LocalSequence}", LogLevel.Warning);

@@ -15,6 +15,8 @@ namespace BSNet.Stream
 {
     public class BSWriter : IBSStream, IDisposable
     {
+        private static Queue<BSWriter> writerPool = new Queue<BSWriter>();
+
         public bool Writing { get { return true; } }
         public bool Reading { get { return false; } }
 
@@ -30,16 +32,54 @@ namespace BSNet.Stream
         private int bitPos = 1;
         private bool forceAddByte;
 
-        public BSWriter(int length)
+        private BSWriter(int length)
         {
             internalStream = new List<byte>(length);
         }
 
-        public BSWriter() : this(0) { }
-
         public void Dispose()
         {
             GC.SuppressFinalize(this);
+            ReturnWriter(this);
+        }
+
+        /// <summary>
+        /// Retrieves a writer from the pool, or creates a new if none exist
+        /// </summary>
+        /// <param name="length">The initial capacity</param>
+        /// <returns>A new writer</returns>
+        public static BSWriter GetWriter(int length)
+        {
+            lock (writerPool)
+            {
+                BSWriter writer;
+                if (writerPool.Count > 0)
+                {
+                    writer = writerPool.Dequeue();
+                    writer.internalStream.Capacity = length;
+                }
+                else
+                {
+                    writer = new BSWriter(length);
+                }
+
+                return writer;
+            }
+        }
+
+        /// <summary>
+        /// Returns the given writer into the pool for later use
+        /// </summary>
+        /// <param name="writer">The writer to return</param>
+        public static void ReturnWriter(BSWriter writer)
+        {
+            lock (writerPool)
+            {
+                writer.bitPos = 1;
+                writer.forceAddByte = false;
+                writer.internalStream.Clear();
+                writerPool.Enqueue(writer);
+            }
         }
 
 

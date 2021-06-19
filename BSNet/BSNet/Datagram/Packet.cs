@@ -1,30 +1,67 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Net;
 
 namespace BSNet.Datagram
 {
-    public struct Packet
+    public class Packet
     {
+        private static Queue<Packet> packetPool = new Queue<Packet>();
+
         public EndPoint AddressPoint { private set; get; }
         public byte[] Bytes { private set; get; }
         public double Time { private set; get; }
 
-        public Packet(EndPoint endPoint, byte[] bytes, int length, double time)
-        {
-            AddressPoint = endPoint;
-            Bytes = new byte[length];
-            Time = time;
+        private Packet() { }
 
-            Buffer.BlockCopy(bytes, 0, Bytes, 0, length);
+        public static Packet GetPacket(EndPoint endPoint, byte[] bytes, int length, double time)
+        {
+            lock (packetPool)
+            {
+                Packet packet;
+                if (packetPool.Count > 0)
+                    packet = packetPool.Dequeue();
+                else
+                    packet = new Packet();
+                
+                packet.AddressPoint = endPoint;
+                packet.Bytes = new byte[length];
+                packet.Time = time;
+                Buffer.BlockCopy(bytes, 0, packet.Bytes, 0, length);
+
+                return packet;
+            }
         }
 
-        public Packet(EndPoint endPoint, byte[] bytes, double time)
+        public static Packet GetPacket(EndPoint endPoint, byte[] bytes, double time)
         {
-            AddressPoint = endPoint;
-            Bytes = new byte[bytes.Length];
-            Time = time;
+            lock (packetPool)
+            {
+                Packet packet;
+                if (packetPool.Count > 0)
+                    packet = packetPool.Dequeue();
+                else
+                    packet = new Packet();
 
-            Buffer.BlockCopy(bytes, 0, Bytes, 0, bytes.Length);
+                packet.AddressPoint = endPoint;
+                packet.Bytes = new byte[bytes.Length];
+                packet.Time = time;
+                Buffer.BlockCopy(bytes, 0, packet.Bytes, 0, bytes.Length);
+
+                return packet;
+            }
+        }
+
+        /// <summary>
+        /// Returns the given packet into the pool for later use
+        /// </summary>
+        /// <param name="packet">The packet to return</param>
+        public static void ReturnPacket(Packet packet)
+        {
+            lock (packetPool)
+            {
+                packetPool.Enqueue(packet);
+            }
         }
     }
 }

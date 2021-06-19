@@ -1,4 +1,7 @@
-﻿using System.Collections.Generic;
+﻿using BSNet.Datagram;
+using BSNet.Stream;
+using System;
+using System.Collections.Generic;
 
 namespace BSNet
 {
