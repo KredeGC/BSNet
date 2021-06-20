@@ -13,9 +13,9 @@ using UnityEngine;
 
 namespace BSNet.Stream
 {
-    public class BSWriter : IBSStream, IDisposable
+    public class BitWriter : IBSStream, IDisposable
     {
-        private static Queue<BSWriter> writerPool = new Queue<BSWriter>();
+        private static Queue<BitWriter> writerPool = new Queue<BitWriter>();
 
         public bool Writing { get { return true; } }
         public bool Reading { get { return false; } }
@@ -24,23 +24,32 @@ namespace BSNet.Stream
         {
             get
             {
-                return BSUtility.BYTE_BITS * internalStream.Count + bitPos - BSUtility.BYTE_BITS;
+                return BSUtility.BYTE_BITS * bytePos + bitPos - 1;
             }
         }
 
-        // TODO: Use byte[] instead of List<byte>
-        private List<byte> internalStream;
+        private byte[] internalStream;
+        private int bytePos = 0;
         private int bitPos = 1;
-        private bool forceAddByte;
 
-        private BSWriter(int length)
+        private BitWriter(int length)
         {
-            internalStream = new List<byte>(length);
+            internalStream = BSPool.GetBuffer(length);
+        }
+
+        ~BitWriter()
+        {
+            Dispose(false);
         }
 
         public void Dispose()
         {
+            Dispose(true);
             GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
             ReturnWriter(this);
         }
 
@@ -49,19 +58,20 @@ namespace BSNet.Stream
         /// </summary>
         /// <param name="length">The initial capacity</param>
         /// <returns>A new writer</returns>
-        public static BSWriter GetWriter(int length = 0)
+        public static BitWriter GetWriter(int length = 0)
         {
             lock (writerPool)
             {
-                BSWriter writer;
+                BitWriter writer;
                 if (writerPool.Count > 0)
                 {
                     writer = writerPool.Dequeue();
-                    writer.internalStream.Capacity = length;
+                    BSPool.ReturnBuffer(writer.internalStream);
+                    writer.internalStream = BSPool.GetBuffer(length);
                 }
                 else
                 {
-                    writer = new BSWriter(length);
+                    writer = new BitWriter(length);
                 }
 
                 return writer;
@@ -72,13 +82,12 @@ namespace BSNet.Stream
         /// Returns the given writer into the pool for later use
         /// </summary>
         /// <param name="writer">The writer to return</param>
-        public static void ReturnWriter(BSWriter writer)
+        public static void ReturnWriter(BitWriter writer)
         {
             lock (writerPool)
             {
+                writer.bytePos = 0;
                 writer.bitPos = 1;
-                writer.forceAddByte = false;
-                writer.internalStream.Clear();
                 writerPool.Enqueue(writer);
             }
         }
@@ -99,11 +108,12 @@ namespace BSNet.Stream
             Buffer.BlockCopy(crcBytes, 0, headerBytes, 0, crcBytes.Length);
             Buffer.BlockCopy(data, 0, headerBytes, crcBytes.Length, data.Length);
 
-            internalStream = headerBytes.ToList();
+            BSPool.ReturnBuffer(internalStream);
+
+            internalStream = headerBytes;
 
             BSPool.ReturnBuffer(combinedBytes);
             BSPool.ReturnBuffer(crcBytes);
-            BSPool.ReturnBuffer(headerBytes);
 
             return true;
         }
@@ -288,7 +298,7 @@ namespace BSNet.Stream
         {
             byte[] raw = BSPool.GetBuffer(data.Length);
             Buffer.BlockCopy(data, 0, raw, 0, data.Length);
-            Write(bitCount, raw, 0, raw.Length);
+            Write(bitCount, raw);
             BSPool.ReturnBuffer(raw);
             return raw;
         }
@@ -296,86 +306,82 @@ namespace BSNet.Stream
 
         public byte[] ToArray() => internalStream.ToArray();
 
-        private int ExpandBuffer(int bitCount)
+        private void Write(int bitCount, byte[] data)
         {
-            if (internalStream.Count == 0)
-                internalStream.Add(0x00);
+            // Expand the stream
+            int expansion = bytePos + (bitPos - 1 + bitCount - 1) / BSUtility.BYTE_BITS + 1;
 
-            int oldPos = internalStream.Count - 1;
-            int bytesToAdd = 0;
-
-            if ((bitCount + (bitPos - 1)) > BSUtility.BYTE_BITS)
+            if (expansion > internalStream.Length)
             {
-                int adjustedBitCount = bitCount - (BSUtility.BYTE_BITS - (bitPos - 1));
-                bytesToAdd = adjustedBitCount / BSUtility.BYTE_BITS;
-                if (adjustedBitCount % BSUtility.BYTE_BITS != 0)
-                    bytesToAdd++;
+                byte[] bytes = BSPool.GetBuffer(expansion);
+                Buffer.BlockCopy(internalStream, 0, bytes, 0, internalStream.Length);
+                
+                BSPool.ReturnBuffer(internalStream);
+
+                internalStream = bytes;
             }
 
-            if (forceAddByte)
-            {
-                bytesToAdd++;
-                oldPos++;
-            }
-
-            for (int i = 0; i < bytesToAdd; i++)
-                internalStream.Add(0x00);
-
-            forceAddByte = false;
-            return oldPos;
-        }
-
-        private void Write(int bitCount, byte[] data, int offset, int length)
-        {
-            length = length - offset - 1;
-
-            //if (BitConverter.IsLittleEndian) Array.Reverse(data);
-
-            int bytePos = ExpandBuffer(bitCount);
-            int srcBytePos = offset + length;
-            int srcBitPos = 1;
+            // Write in little-endian
+            int byteCountCeil = (bitCount - 1) / BSUtility.BYTE_BITS + 1;
+            int maxBytes = data.Length - byteCountCeil;
             int consumedBits = 0;
 
-            while (consumedBits < bitCount)
+            // Optimization if the stream isn't offset by bits
+            if (bitPos == 1)
+            {
+                // Reverse array
+                if (data.Length > 1 && BitConverter.IsLittleEndian)
+                    Array.Reverse(data);
+
+                // Copy byte array into stream
+                Buffer.BlockCopy(data, 0, internalStream, bytePos, byteCountCeil);
+                bytePos += byteCountCeil;
+
+                // If bitcount isn't whole, set the last byte to the correct bits
+                int endBits = bitCount % BSUtility.BYTE_BITS;
+                if (endBits != 0)
+                {
+                    bytePos--;
+                    internalStream[bytePos] = (byte)(data[bitCount / BSUtility.BYTE_BITS] << (BSUtility.BYTE_BITS - endBits));
+                    bitPos += endBits;
+                }
+
+                return;
+            }
+
+            // Pack the bits into the stream
+            for (int i = data.Length - 1; i >= maxBytes; i--)
             {
                 int bitsToConsume = Math.Min(bitCount - consumedBits, BSUtility.BYTE_BITS);
-                byte rawValue = (byte)(data[srcBytePos] & BSUtility.GetNarrowingMask(bitsToConsume));
                 int remainingBits = BSUtility.BYTE_BITS - (bitPos - 1);
 
-                // Extract only the bits we need for the current byte
-                // Assuming we have more bits than our current byte boundary, we have to apply some bits to the next byte
+                byte value;
+                if (BitConverter.IsLittleEndian)
+                    value = (byte)(data[i] & BSUtility.GetNarrowingMask(bitsToConsume));
+                else
+                    value = (byte)(data[data.Length - 1 - i] & BSUtility.GetNarrowingMask(bitsToConsume));
+
                 if (bitsToConsume > remainingBits)
                 {
-                    internalStream[bytePos++] |= (byte)((byte)(rawValue >> (bitsToConsume - remainingBits)) & BSUtility.GetNarrowingMask(remainingBits));
+                    // Add the first part of the value
+                    internalStream[bytePos++] |= (byte)((byte)(value >> (bitsToConsume - remainingBits)) & BSUtility.GetNarrowingMask(remainingBits));
                     bitPos = 1;
                     remainingBits = bitsToConsume - remainingBits;
 
-                    internalStream[bytePos] |= (byte)(rawValue << (BSUtility.BYTE_BITS - remainingBits));
+                    // Add the second part of the value, doesn't need the '|'
+                    internalStream[bytePos] |= (byte)(value << (BSUtility.BYTE_BITS - remainingBits));
                     bitPos += remainingBits;
-                    forceAddByte = false;
                 }
                 else
                 {
-                    internalStream[bytePos] |= (byte)(rawValue << (remainingBits - bitsToConsume));
+                    // Offset and add the value
+                    internalStream[bytePos] |= (byte)(value << (remainingBits - bitsToConsume));
                     bitPos += bitsToConsume;
                     if (bitPos > BSUtility.BYTE_BITS)
                     {
                         bitPos = 1;
                         bytePos++;
-                        // If the bits are directly on the border of a byte boundary (e.g. packed 32 bits)
-                        // Then we must indicate to the expansion function that it must add another byte
-                        // Because it uses the position in the current byte to determine how many are needed
-                        // But only if we end on this byte
-                        forceAddByte = true;
                     }
-                    else forceAddByte = false;
-                }
-
-                srcBitPos += bitsToConsume;
-                if (srcBitPos > BSUtility.BYTE_BITS)
-                {
-                    srcBitPos = 1;
-                    srcBytePos--;
                 }
 
                 consumedBits += bitsToConsume;

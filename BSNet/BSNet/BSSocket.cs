@@ -119,6 +119,9 @@ namespace BSNet
             }
         }
 
+        /// <summary>
+        /// Called to handle incoming messages at the given tickrate
+        /// </summary>
         public virtual void Update()
         {
 #if (ENABLE_MONO || ENABLE_IL2CPP)
@@ -258,7 +261,7 @@ namespace BSNet
             connection.IncrementSequence(ElapsedTime);
 
             byte[] rawBytes;
-            using (BSWriter writer = BSWriter.GetWriter(headerSize))
+            using (BitWriter writer = BitWriter.GetWriter(headerSize))
             {
                 // Write header data
                 using (Header header = Header.GetHeader(type, connection.LocalSequence,
@@ -305,7 +308,6 @@ namespace BSNet
         protected virtual void AddReliableMessage(ClientConnection connection, byte[] bytes)
         {
             Packet msg = Packet.GetPacket(connection.AddressPoint, bytes, ElapsedTime);
-            //Packet msg = new Packet(connection.AddressPoint, bytes, ElapsedTime);
 
             ConnectionSequence connSeq = new ConnectionSequence(connection.AddressPoint, connection.LocalSequence);
             if (!unsentMessages.ContainsKey(connSeq))
@@ -324,7 +326,8 @@ namespace BSNet
             // The length is less than the header, certainly malicious
             if (length < headerSize)
             {
-                BSPool.ReturnBuffer(rawBytes);
+                // Don't return the buffer, we hopefully won't be needing it again
+                // BSPool.ReturnBuffer(rawBytes);
                 return;
             }
 
@@ -401,7 +404,7 @@ namespace BSNet
                                         if (unsentMessages.TryGetValue(conSeq, out Packet packet))
                                         {
                                             Packet.ReturnPacket(packet);
-                                            unsentMessages.Remove(new ConnectionSequence(endPoint, seq));
+                                            unsentMessages.Remove(conSeq);
                                         }
                                         // OnMessageAcknowledged(seq);
                                     }

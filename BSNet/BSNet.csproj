@@ -52,6 +52,7 @@
     <Compile Include="BSNet\Cryptography.cs" />
     <Compile Include="BSNet\Datagram\ConnectionSequence.cs" />
     <Compile Include="BSNet\Datagram\Header.cs" />
+    <Compile Include="BSNet\Stream\BitWriter.cs" />
     <Compile Include="BSNet\Stream\IBSSerializable.cs" />
     <Compile Include="BSNet\LogLevel.cs" />
     <Compile Include="BSNet\Datagram\Packet.cs" />

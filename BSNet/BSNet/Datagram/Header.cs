@@ -36,6 +36,7 @@ namespace BSNet.Datagram
         /// Retrieves a header from the pool, or creates a new if none exist
         /// </summary>
         /// <param name="stream">The stream to read from</param>
+        /// <exception cref="InvalidOperationException"></exception>
         /// <returns>A new header</returns>
         public static Header GetHeader(IBSStream stream)
         {
@@ -50,7 +51,7 @@ namespace BSNet.Datagram
                 if (stream.Reading)
                     header.Serialize(stream);
                 else
-                    throw new Exception("Cannot initialize header from writable stream");
+                    throw new InvalidOperationException("Cannot initialize header from writable stream");
 
                 return header;
             }

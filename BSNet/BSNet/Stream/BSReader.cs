@@ -316,6 +316,7 @@ namespace BSNet.Stream
 
             data = new byte[typeBytes];
 
+            // Read in little-endian
             int destBytePos = data.Length - 1;
             int destBitPos = 1;
             int consumedBits = 0;
@@ -376,7 +377,9 @@ namespace BSNet.Stream
                 consumedBits += bitsToConsume;
             }
 
-            //if (BitConverter.IsLittleEndian) Array.Reverse(data);
+            if (!BitConverter.IsLittleEndian)
+                Array.Reverse(data);
+
             return true;
         }
     }
