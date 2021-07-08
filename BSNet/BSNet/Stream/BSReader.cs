@@ -305,6 +305,12 @@ namespace BSNet.Stream
             return raw;
         }
 
+        public byte[] SerializeBytes(byte[] data = null)
+        {
+            Read(data.Length * BSUtility.BYTE_BITS, out byte[] raw, data.Length);
+            return raw;
+        }
+
 
         private bool Read(int bitCount, out byte[] data, int typeBytes)
         {

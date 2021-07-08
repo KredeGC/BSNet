@@ -49,6 +49,7 @@ namespace BSNet.Stream
         IPEndPoint SerializeIPEndPoint(IPEndPoint endPoint = default(IPEndPoint));
 
         // Bytes
+        byte[] SerializeBytes(byte[] bytes = null);
         byte[] SerializeBytes(int bitCount, byte[] bytes = null);
     }
 }

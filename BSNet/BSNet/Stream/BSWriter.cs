@@ -293,6 +293,15 @@ namespace BSNet.Stream
             return raw;
         }
 
+        public byte[] SerializeBytes(byte[] data = null)
+        {
+            byte[] raw = BSPool.GetBuffer(data.Length);
+            Buffer.BlockCopy(data, 0, raw, 0, data.Length);
+            Write(data.Length * BSUtility.BYTE_BITS, raw, 0, raw.Length);
+            BSPool.ReturnBuffer(raw);
+            return raw;
+        }
+
 
         public byte[] ToArray() => internalStream.ToArray();
 
