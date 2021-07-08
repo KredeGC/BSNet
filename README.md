@@ -84,30 +84,29 @@ public class Client : BSSocket
 The readers and writers have built-in functionality for packing bits as tight as you want.
 They can also quantize floats, halfs, Vectors and Quaternions, to keep the bits low.
 ```csharp
-// Create a new BSWriter
-BSWriter writer = BSWriter.GetWriter();
-
 // Create a new BoundedRange, with a minimum value of 0, a maximum of 1 and 0.01 in precision
 // This range will crunch a float into just 7 bits
 BoundedRange range = new BoundedRange(0, 1, 0.01f);
 
-// Write a couple of floats to the writer
-writer.SerializeFloat(range, 0.23167f);
-writer.SerializeFloat(range, 0.55f);
-
-// Return the bytes in a packed array
-byte[] bytes = writer.ToArray();
-Console.WriteLine($"Total bits used: {writer.TotalBits}"); // Prints 14
-Console.WriteLine($"Total length of byte array: {bytes.Length}"); // Prints 2
+// Create a new BSWriter
+byte[] bytes;
+using (BSWriter writer = BSWriter.GetWriter()) {
+    // Write a couple of floats to the writer
+    writer.SerializeFloat(range, 0.23167f);
+    writer.SerializeFloat(range, 0.55f);
+    
+    // Return the bytes in a packed array
+    bytes = writer.ToArray();
+    
+    Console.WriteLine($"Total bits used: {writer.TotalBits}"); // Prints 14
+    Console.WriteLine($"Total length of byte array: {bytes.Length}"); // Prints 2
+}
 
 // Create a new BSReader from the byte array
-BSReader reader = BSReader.GetReader(bytes);
-
-// Read the 2 floats
-float firstFloat = reader.SerializeFloat(range);
-float secondFloat = reader.SerializeFloat(range);
-Console.WriteLine($"Floats read: {firstFloat}, {secondFloat}"); // Prints 0.23 and 0.55
-
-writer.Dispose();
-reader.Dispose();
+using (BSReader reader = BSReader.GetReader(bytes)) {
+    // Read the 2 floats
+    float firstFloat = reader.SerializeFloat(range);
+    float secondFloat = reader.SerializeFloat(range);
+    Console.WriteLine($"Floats read: {firstFloat}, {secondFloat}"); // Prints 0.23 and 0.55
+}
 ```

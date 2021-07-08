@@ -273,11 +273,14 @@ namespace BSNet
             connection.IncrementSequence(ElapsedTime);
 
             byte[] rawBytes;
-            using (BitWriter writer = BitWriter.GetWriter(headerSize))
+            using (BSWriter writer = BSWriter.GetWriter(headerSize))
             {
                 // Write header data
-                using (Header header = Header.GetHeader(type, connection.LocalSequence,
-                    connection.RemoteSequence, connection.AckBits, token))
+                using (Header header = Header.GetHeader(type,
+                    connection.LocalSequence,
+                    connection.RemoteSequence,
+                    connection.AckBits,
+                    token))
                 {
                     header.Serialize(writer);
                 }
