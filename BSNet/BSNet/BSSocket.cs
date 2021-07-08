@@ -179,9 +179,10 @@ namespace BSNet
         /// </summary>
         /// <param name="endPoint">The endPoint to send it to</param>
         /// <param name="serializable">The serializable to fill the message</param>
-        public virtual void SendMessageUnreliable(EndPoint endPoint, IBSSerializable serializable)
+        /// <returns>The sequence of the sent message</returns>
+        public virtual ushort SendMessageUnreliable(EndPoint endPoint, IBSSerializable serializable)
         {
-            SendMessageUnreliable(endPoint, writer =>
+            return SendMessageUnreliable(endPoint, writer =>
             {
                 serializable.Serialize(writer);
             });
@@ -192,7 +193,8 @@ namespace BSNet
         /// </summary>
         /// <param name="endPoint">The endPoint to send it to</param>
         /// <param name="action">The method to fill the buffer with data</param>
-        public virtual void SendMessageUnreliable(EndPoint endPoint, Action<IBSStream> action = null)
+        /// <returns>The sequence of the sent message</returns>
+        public virtual ushort SendMessageUnreliable(EndPoint endPoint, Action<IBSStream> action = null)
         {
             // Check if authenticated
             if (connections.TryGetValue(endPoint, out ClientConnection connection) && connection.Authenticated)
@@ -201,7 +203,11 @@ namespace BSNet
                 {
                     action?.Invoke(writer);
                 });
+
+                return connection.LocalSequence;
             }
+
+            return 0;
         }
 
         /// <summary>
@@ -209,9 +215,10 @@ namespace BSNet
         /// </summary>
         /// <param name="endPoint">The endPoint to send it to</param>
         /// <param name="serializable">The serializable to fill the message</param>
-        public virtual void SendMessageReliable(EndPoint endPoint, IBSSerializable serializable)
+        /// <returns>The sequence of the sent message</returns>
+        public virtual ushort SendMessageReliable(EndPoint endPoint, IBSSerializable serializable)
         {
-            SendMessageReliable(endPoint, writer =>
+            return SendMessageReliable(endPoint, writer =>
             {
                 serializable.Serialize(writer);
             });
@@ -222,7 +229,8 @@ namespace BSNet
         /// </summary>
         /// <param name="endPoint">The endPoint to send it to</param>
         /// <param name="action">The method to fill the buffer with data</param>
-        public virtual void SendMessageReliable(EndPoint endPoint, Action<IBSStream> action = null)
+        /// <returns>The sequence of the sent message</returns>
+        public virtual ushort SendMessageReliable(EndPoint endPoint, Action<IBSStream> action = null)
         {
             // Check if authenticated
             if (connections.TryGetValue(endPoint, out ClientConnection connection) && connection.Authenticated)
@@ -234,7 +242,11 @@ namespace BSNet
 
                 // Add message to backlog
                 AddReliableMessage(connection, rawBytes);
+
+                return connection.LocalSequence;
             }
+
+            return 0;
         }
 
         /// <summary>
@@ -335,7 +347,10 @@ namespace BSNet
             using (BSReader reader = BSReader.GetReader(rawBytes, length))
             {
                 if (!reader.SerializeChecksum(ProtocolVersion))
+                {
+                    Log($"Mismatching CRC checksum for {endPoint}", LogLevel.Warning);
                     return;
+                }
 
                 // Read header data
                 using (Header header = Header.GetHeader(reader))
@@ -412,7 +427,7 @@ namespace BSNet
 
                                 // Validate packet and return payload to application
                                 if (!connection.IsAcknowledged(header.Sequence) && header.Type == ConnectionType.MESSAGE)
-                                    OnReceiveMessage((IPEndPoint)endPoint, reader);
+                                    OnReceiveMessage((IPEndPoint)endPoint, header.Sequence, reader);
 
                                 // Acknowledge this packet
                                 connection.Acknowledge(header.Sequence);
@@ -577,6 +592,6 @@ namespace BSNet
 
         protected abstract void OnDisconnect(IPEndPoint endPoint);
 
-        protected abstract void OnReceiveMessage(IPEndPoint endPoint, IBSStream reader);
+        protected abstract void OnReceiveMessage(IPEndPoint endPoint, ushort sequence, IBSStream reader);
     }
 }

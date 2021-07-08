@@ -65,7 +65,7 @@ namespace BSNet.Example
         }
 
         // Called when we receive a message from this IPEndPoint
-        protected override void OnReceiveMessage(IPEndPoint endPoint, IBSStream reader)
+        protected override void OnReceiveMessage(IPEndPoint endPoint, ushort sequence, IBSStream reader)
         {
             // Create an empty message
             ExamplePacket emptySerializable = new ExamplePacket();
