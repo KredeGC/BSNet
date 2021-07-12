@@ -14,6 +14,13 @@ namespace BSNet.Datagram
         public uint AckBits { private set; get; }
         public ulong Token { private set; get; }
 
+        public const int HEADER_SIZE =
+            sizeof(byte) + // ConnectionType (2 bits)
+            sizeof(ushort) + // Sequence of this packet (2 bytes)
+            sizeof(ushort) + // Acknowledgement for most recent received packet (2 bytes)
+            sizeof(uint) + // Bitfield of acknowledgements before most recent (4 bytes)
+            sizeof(ulong); // Token or LocalToken if not authenticated (8 bytes)
+
         private Header() { }
 
         ~Header()

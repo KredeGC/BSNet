@@ -8,18 +8,26 @@ namespace BSNetTest
     {
         public TestContext TestContext { get; set; }
 
+        /// <summary>
+        /// Test the ability to retrieve a writer
+        /// <para>Fails if the 2 writers refer to the same object</para>
+        /// </summary>
         [TestMethod]
         public void WriterPoolTest()
         {
             NewWriter occupy1 = NewWriter.GetWriter(4);
             NewWriter occupy2 = NewWriter.GetWriter(4);
 
-            Assert.AreNotEqual(occupy1, occupy2);
+            Assert.AreNotSame(occupy1, occupy2);
 
             NewWriter.ReturnWriter(occupy1);
             NewWriter.ReturnWriter(occupy2);
         }
 
+        /// <summary>
+        /// Test the ability to retrieve a reader
+        /// <para>Fails if the 2 readers refer to the same object</para>
+        /// </summary>
         [TestMethod]
         public void ReaderPoolTest()
         {
@@ -28,17 +36,22 @@ namespace BSNetTest
             NewReader occupy1 = NewReader.GetReader(rawBytes);
             NewReader occupy2 = NewReader.GetReader(rawBytes);
 
-            Assert.AreNotEqual(occupy1, occupy2);
+            Assert.AreNotSame(occupy1, occupy2);
 
             NewReader.ReturnReader(occupy1);
             NewReader.ReturnReader(occupy2);
         }
 
+        /// <summary>
+        /// Test the ability to export the byte array from one stream and write it directly into another
+        /// <para>Fails if the stream size doesn't match, the bitcount doesn't match or the content doesn't match</para>
+        /// </summary>
         [TestMethod]
         public void NestedWriterTest()
         {
             using (NewWriter writer1 = NewWriter.GetWriter())
             {
+                // Write some bits
                 writer1.SerializeUInt(273U, 11);
                 writer1.SerializeUInt(273U, 11);
                 writer1.SerializeUInt(273U, 11);
@@ -46,12 +59,13 @@ namespace BSNetTest
 
                 using (NewWriter writer2 = NewWriter.GetWriter())
                 {
+                    // Take that byte array and write it directly int a new writer
                     writer2.SerializeBytes(writer1.TotalBits, writer1Bytes, true);
 
                     byte[] writer2Bytes = writer2.ToArray();
 
-                    Assert.AreEqual(writer1.TotalBits, writer2.TotalBits);
-                    Assert.AreEqual(writer1Bytes.Length, writer2Bytes.Length);
+                    Assert.AreEqual(writer2.TotalBits, writer1.TotalBits);
+                    Assert.AreEqual(writer2Bytes.Length, writer1Bytes.Length);
 
                     for (int i = 0; i < writer1Bytes.Length; i++)
                         Assert.AreEqual(writer1Bytes[i], writer2Bytes[i]);
@@ -59,6 +73,10 @@ namespace BSNetTest
             }
         }
 
+        /// <summary>
+        /// Test the ability to read and write bits
+        /// <para>Fails if the input doesn't match the output</para>
+        /// </summary>
         [TestMethod]
         public void PrecisionReadWriteTest()
         {
@@ -78,20 +96,25 @@ namespace BSNetTest
 
             using (NewReader reader = NewReader.GetReader(rawBytes))
             {
-                Assert.AreEqual(reader.SerializeUInt(0, 1), 1U);
-                Assert.AreEqual(reader.SerializeUInt(0, 11), 273U);
-                Assert.AreEqual(reader.SerializeUInt(0, 17), 273U);
-                Assert.AreEqual(reader.SerializeUInt(0, 14), 16383U);
-                Assert.AreEqual(reader.SerializeUInt(0, 11), 511U);
-                Assert.AreEqual(reader.SerializeUInt(0, 32), 0b10101010111111111010101000001111);
-                Assert.AreEqual(reader.SerializeUShort(0, 10), 211U);
-                Assert.AreEqual(reader.SerializeUShort(0, 7), 126U);
+                Assert.AreEqual(1U, reader.SerializeUInt(0, 1));
+                Assert.AreEqual(273U, reader.SerializeUInt(0, 11));
+                Assert.AreEqual(273U, reader.SerializeUInt(0, 17));
+                Assert.AreEqual(16383U, reader.SerializeUInt(0, 14));
+                Assert.AreEqual(511U, reader.SerializeUInt(0, 11));
+                Assert.AreEqual(0b10101010111111111010101000001111, reader.SerializeUInt(0, 32));
+                Assert.AreEqual(211U, reader.SerializeUShort(0, 10));
+                Assert.AreEqual(126U, reader.SerializeUShort(0, 7));
             }
         }
 
+        /// <summary>
+        /// Test whether writing data with overflow produces the correct results
+        /// <para>Fails if the input doesn't match the output</para>
+        /// </summary>
         [TestMethod]
         public void OverflowReadWriteTest()
         {
+            // Write some random bits
             byte[] rawBytes;
             using (NewWriter writer1 = NewWriter.GetWriter(1))
             {
@@ -102,12 +125,54 @@ namespace BSNetTest
                 rawBytes = writer1.ToArray();
             }
 
+            // Read those bits back
             using (NewReader reader = NewReader.GetReader(rawBytes))
             {
-                Assert.AreEqual(reader.SerializeUInt(0, 10), 1023U);
-                Assert.AreEqual(reader.SerializeUInt(0, 3), 7U);
-                Assert.AreEqual(reader.SerializeUInt(0, 11), 2047U);
-                Assert.AreEqual(reader.SerializeUInt(0, 31), 2147483647U);
+                Assert.AreEqual(1023U, reader.SerializeUInt(0, 10));
+                Assert.AreEqual(7U, reader.SerializeUInt(0, 3));
+                Assert.AreEqual(2047U, reader.SerializeUInt(0, 11));
+                Assert.AreEqual(2147483647U, reader.SerializeUInt(0, 31));
+            }
+        }
+
+        /// <summary>
+        /// Test a range of unsigned integers and compare size and content
+        /// <para>Fails if the size of the array doesn't match or the given integers don't match</para>
+        /// </summary>
+        [TestMethod]
+        public void UIntRangeReadWriteTest()
+        {
+            byte[] rawBytes;
+            using (NewWriter writer = NewWriter.GetWriter())
+            {
+                uint value = 1;
+                for (int i = 1; i <= 32; i++)
+                {
+                    writer.SerializeUInt(value, i);
+
+                    value <<= 1;
+                }
+
+                rawBytes = writer.ToArray();
+
+                int expectedBitSize = 0;
+                for (int i = 1; i <= 32; i++)
+                    expectedBitSize += i;
+                int expectedByteSize = (expectedBitSize - 1) / 8 + 1;
+
+                Assert.AreEqual(expectedBitSize, writer.TotalBits);
+                Assert.AreEqual(expectedByteSize, rawBytes.Length);
+            }
+            
+            using (NewReader reader = NewReader.GetReader(rawBytes))
+            {
+                uint value = 1;
+                for (int i = 1; i <= 32; i++)
+                {
+                    Assert.AreEqual(value, reader.SerializeUInt(0, i));
+
+                    value <<= 1;
+                }
             }
         }
     }

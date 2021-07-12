@@ -10,7 +10,7 @@ namespace BSNet
     public static class BSUtility
     {
         public const int TIMEOUT = 10;
-        public const int BYTE_BITS = 8;
+        public const int BITS = 8;
         public const int RTT_BUFFER_SIZE = 256;
         public const int RECEIVE_BUFFER_SIZE = 1024;
 
@@ -19,7 +19,7 @@ namespace BSNet
         static BSUtility()
         {
             // Bit 0 isn't used
-            int maskCount = BYTE_BITS + 1;
+            int maskCount = BITS + 1;
             sBitMasks = new byte[maskCount];
 
             for (int i = 1; i < maskCount; i++)
@@ -37,7 +37,7 @@ namespace BSNet
         public static byte GetWideningMask(int bitCount, int startBit)
         {
             byte bitMask = sBitMasks[bitCount];
-            bitMask <<= (BYTE_BITS - bitCount);
+            bitMask <<= (BITS - bitCount);
             bitMask >>= startBit;
             return bitMask;
         }
@@ -180,7 +180,7 @@ namespace BSNet
 
         public static byte[] Trim(byte[] rawBytes, int start, int bitCount)
         {
-            int length = (bitCount - 1) / BYTE_BITS + 1;
+            int length = (bitCount - 1) / BITS + 1;
             byte[] shiftedBytes = new byte[length];
             int leftShift = start % 8;
             int rightShift = 8 - leftShift;
@@ -200,11 +200,11 @@ namespace BSNet
 
         public static byte[] TrimLeft(byte[] rawBytes, int bitCount)
         {
-            int length = (bitCount - 1) / BYTE_BITS + 1;
+            int length = (bitCount - 1) / BITS + 1;
             byte[] shiftedBytes = new byte[length];
             int leftShift = (8 - bitCount % 8) % 8;
             int rightShift = 8 - leftShift;
-            int skip = (rawBytes.Length * BYTE_BITS - bitCount) / 8;
+            int skip = (rawBytes.Length * BITS - bitCount) / 8;
 
             for (int i = 0; i < length; i++)
             {
@@ -220,31 +220,27 @@ namespace BSNet
             return shiftedBytes;
         }
 
-        public static void PrintBits(byte[] data)
+        public static string GetBits(byte[] data)
         {
             int[] fields = new int[8];
             for (int i = 0; i < 8; i++)
                 fields[i] = 1 << (7 - i);
-
-            //{
-            //    0b00000001,
-            //    0b00000010,
-            //    0b00000100,
-            //    0b00001000,
-            //    0b00010000,
-            //    0b00100000,
-            //    0b01000000,
-            //    0b10000000,
-            //};
 
             string str = string.Empty;
             for (int i = 0; i < data.Length; i++)
             {
                 for (int j = 0; j < fields.Length; j++)
                     str += (data[i] & fields[j]) > 0 ? 1 : 0;
-                str += " ";
+                if (i < data.Length - 1)
+                    str += " ";
             }
-            Console.WriteLine(str);
+
+            return str;
+        }
+
+        public static void PrintBits(byte[] data)
+        {
+            Console.WriteLine(GetBits(data));
         }
 
         public static byte[] BitShiftLeft(byte[] rawBytes, int length, int shift)
@@ -252,7 +248,7 @@ namespace BSNet
             byte[] shiftedBytes = new byte[length];
             int shiftRemainder = shift % 8;
             int skip = shift / 8;
-            
+
             for (int i = 0; i < length; i++)
             {
                 shiftedBytes[i] = (byte)(rawBytes[i + skip] << shiftRemainder);

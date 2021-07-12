@@ -23,7 +23,7 @@ namespace BSNet.Stream
         {
             get
             {
-                return BSUtility.BYTE_BITS * internalStream.Length - BSUtility.BYTE_BITS * bytePos - bitPos + 1;
+                return BSUtility.BITS * internalStream.Length - BSUtility.BITS * bytePos - bitPos + 1;
             }
         }
 
@@ -146,31 +146,31 @@ namespace BSNet.Stream
         // Padding
         public byte[] PadToEnd()
         {
-            int remaining = (BSUtility.RECEIVE_BUFFER_SIZE - 4) * BSUtility.BYTE_BITS - TotalBits;
+            int remaining = (BSUtility.RECEIVE_BUFFER_SIZE - 4) * BSUtility.BITS - TotalBits;
             byte[] padding = SerializeBytes(remaining);
             return padding;
         }
 
         // Unsigned
-        public byte SerializeByte(byte value = default(byte), int bitCount = sizeof(byte) * BSUtility.BYTE_BITS)
+        public byte SerializeByte(byte value = default(byte), int bitCount = sizeof(byte) * BSUtility.BITS)
         {
             byte[] bytes = SerializeBytes(bitCount);
             return bytes[0];
         }
 
-        public ushort SerializeUShort(ushort value = default(ushort), int bitCount = sizeof(ushort) * BSUtility.BYTE_BITS)
+        public ushort SerializeUShort(ushort value = default(ushort), int bitCount = sizeof(ushort) * BSUtility.BITS)
         {
             ulong val = SerializeULong(value, bitCount);
             return (ushort)val;
         }
 
-        public uint SerializeUInt(uint value = default(uint), int bitCount = sizeof(uint) * BSUtility.BYTE_BITS)
+        public uint SerializeUInt(uint value = default(uint), int bitCount = sizeof(uint) * BSUtility.BITS)
         {
             ulong val = SerializeULong(value, bitCount);
             return (uint)val;
         }
 
-        public ulong SerializeULong(ulong value = default(ulong), int bitCount = sizeof(ulong) * BSUtility.BYTE_BITS)
+        public ulong SerializeULong(ulong value = default(ulong), int bitCount = sizeof(ulong) * BSUtility.BITS)
         {
             byte[] bytes = SerializeBytes(bitCount);
 
@@ -183,28 +183,28 @@ namespace BSNet.Stream
         }
 
         // Signed
-        public sbyte SerializeSByte(sbyte value = default(sbyte), int bitCount = sizeof(sbyte) * BSUtility.BYTE_BITS)
+        public sbyte SerializeSByte(sbyte value = default(sbyte), int bitCount = sizeof(sbyte) * BSUtility.BITS)
         {
             byte val = SerializeByte(0, bitCount);
             sbyte zagzig = (sbyte)((val >> 1) ^ (-(sbyte)(val & 1)));
             return zagzig;
         }
 
-        public short SerializeShort(short value = default(short), int bitCount = sizeof(short) * BSUtility.BYTE_BITS)
+        public short SerializeShort(short value = default(short), int bitCount = sizeof(short) * BSUtility.BITS)
         {
             ushort val = SerializeUShort(0, bitCount);
             short zagzig = (short)((val >> 1) ^ (-(short)(val & 1)));
             return zagzig;
         }
 
-        public int SerializeInt(int value = default(int), int bitCount = sizeof(int) * BSUtility.BYTE_BITS)
+        public int SerializeInt(int value = default(int), int bitCount = sizeof(int) * BSUtility.BITS)
         {
             uint val = SerializeUInt(0, bitCount);
             int zagzig = (int)((val >> 1) ^ (-(int)(val & 1)));
             return zagzig;
         }
 
-        public long SerializeLong(long value = default(long), int bitCount = sizeof(long) * BSUtility.BYTE_BITS)
+        public long SerializeLong(long value = default(long), int bitCount = sizeof(long) * BSUtility.BITS)
         {
             ulong val = SerializeULong(0, bitCount);
             long zagzig = (long)(val >> 1) ^ (-(long)(val & 1));
@@ -275,7 +275,7 @@ namespace BSNet.Stream
 
             if (length > 0)
             {
-                byte[] bytes = SerializeBytes(length * BSUtility.BYTE_BITS);
+                byte[] bytes = SerializeBytes(length * BSUtility.BITS);
                 return encoding.GetString(bytes);
             }
             return string.Empty;
@@ -284,7 +284,7 @@ namespace BSNet.Stream
         // IPs
         public IPAddress SerializeIPAddress(IPAddress ipAddress)
         {
-            byte[] addressBytes = SerializeBytes(4 * BSUtility.BYTE_BITS);
+            byte[] addressBytes = SerializeBytes(4 * BSUtility.BITS);
 
             return new IPAddress(addressBytes);
         }
@@ -308,7 +308,7 @@ namespace BSNet.Stream
 
         public byte[] SerializeBytes(byte[] data = null)
         {
-            byte[] raw = Read(data.Length * BSUtility.BYTE_BITS);
+            byte[] raw = Read(data.Length * BSUtility.BITS);
             //Read(data.Length * BSUtility.BYTE_BITS, out byte[] raw, data.Length);
             return raw;
         }
@@ -316,34 +316,75 @@ namespace BSNet.Stream
 
         private byte[] Read(int bitCount)
         {
+            if (bitCount <= 0)
+                return new byte[0];
+
             if (bitCount > TotalBits)
                 throw new ArgumentOutOfRangeException("Requested bitCount larger than stream");
 
-            // TODO: Optimize to use a single for loop
-            //int length = (bitCount - 1) / BSUtility.BYTE_BITS + 1;
-            //byte[] data = new byte[length];
-            //int byteCountCeil = (bitCount - 1 + bitPos - 1) / BSUtility.BYTE_BITS + 1;
+            // The total length of the bytes
+            int length = (bitCount - 1) / BSUtility.BITS + 1;
+            byte[] data = new byte[length];
 
-            //for (int i = 0; i < byteCountCeil; i++)
-            //{
+            // The offset to shift by
+            int offset = (BSUtility.BITS - bitCount % BSUtility.BITS) % BSUtility.BITS;
+            int leftShift = (bitPos - 1) % BSUtility.BITS;
+            int rightShift = BSUtility.BITS - leftShift;
+            byte leftValue = 0;
 
-            //}
-
-
-            int bitOffset = (bytePos * BSUtility.BYTE_BITS + bitPos - 1);
-            int shift = (8 - bitCount % 8) % 8;
-            byte[] data = BSUtility.Trim(internalStream, bitOffset, bitCount);
-            byte[] newData = BSUtility.BitShiftRight(data, data.Length, shift);
-
-            bytePos += bitCount / BSUtility.BYTE_BITS;
-            bitPos += bitCount % 8;
-            if (bitPos > BSUtility.BYTE_BITS)
+            // Go through the stream
+            for (int i = 0; i < length; i++)
             {
-                bitPos -= BSUtility.BYTE_BITS;
+                // Add the bits from the first part, shifted by bitPos
+                byte value = (byte)(internalStream[bytePos + i] << leftShift);
+
+                // Add the bits from the second part, shifted by 8 - bitPos
+                if (bytePos + i + 1 < internalStream.Length)
+                    value |= (byte)(internalStream[bytePos + i + 1] >> rightShift);
+
+                if (offset > 0)
+                {
+                    byte original = value;
+
+                    // Shift to the right to correct the data
+                    value = (byte)(value >> offset);
+
+                    // Shift part of the value on the left into this value
+                    if (bytePos + i - 1 >= 0)
+                        value |= (byte)(leftValue << BSUtility.BITS - offset);
+
+                    leftValue = original;
+                }
+
+                data[i] = value;
+            }
+
+            // Offset read count by bitCount
+            bytePos += bitCount / BSUtility.BITS;
+            bitPos += bitCount % BSUtility.BITS;
+            if (bitPos > BSUtility.BITS)
+            {
+                bitPos -= BSUtility.BITS;
                 bytePos++;
             }
 
-            return newData;
+            return data;
+
+
+            //int bitOffset = (bytePos * BSUtility.BYTE_BITS + bitPos - 1);
+            //int shift = (8 - bitCount % 8) % 8;
+            //byte[] data = BSUtility.Trim(internalStream, bitOffset, bitCount);
+            //byte[] newData = BSUtility.BitShiftRight(data, data.Length, shift);
+
+            //bytePos += bitCount / BSUtility.BYTE_BITS;
+            //bitPos += bitCount % 8;
+            //if (bitPos > BSUtility.BYTE_BITS)
+            //{
+            //    bitPos -= BSUtility.BYTE_BITS;
+            //    bytePos++;
+            //}
+
+            //return newData;
         }
 
 
@@ -364,13 +405,13 @@ namespace BSNet.Stream
 
             while (consumedBits < bitCount)
             {
-                int bitsToConsume = Math.Min(bitCount - consumedBits, BSUtility.BYTE_BITS);
-                int remainingBits = BSUtility.BYTE_BITS - (bitPos - 1);
+                int bitsToConsume = Math.Min(bitCount - consumedBits, BSUtility.BITS);
+                int remainingBits = BSUtility.BITS - (bitPos - 1);
                 int attemptConsumeBits = Math.Min(bitsToConsume, remainingBits);
                 byte rawValue = (byte)(internalStream[bytePos] & BSUtility.GetWideningMask(attemptConsumeBits, bitPos - 1));
 
                 bitPos += attemptConsumeBits;
-                if (bitPos > BSUtility.BYTE_BITS)
+                if (bitPos > BSUtility.BITS)
                 {
                     bitPos = 1;
                     bytePos++;
@@ -380,7 +421,7 @@ namespace BSNet.Stream
                 {
                     data[destBytePos] |= (byte)(rawValue << (bitsToConsume - attemptConsumeBits));
                     destBitPos += attemptConsumeBits;
-                    if (destBitPos > BSUtility.BYTE_BITS)
+                    if (destBitPos > BSUtility.BITS)
                     {
                         destBitPos = 1;
                         destBytePos--;
@@ -388,17 +429,17 @@ namespace BSNet.Stream
 
                     remainingBits = bitsToConsume - attemptConsumeBits;
                     rawValue = (byte)(internalStream[bytePos] & BSUtility.GetWideningMask(remainingBits, bitPos - 1));
-                    data[destBytePos] |= (byte)(rawValue >> (BSUtility.BYTE_BITS - remainingBits));
+                    data[destBytePos] |= (byte)(rawValue >> (BSUtility.BITS - remainingBits));
 
                     destBitPos += remainingBits;
-                    if (destBitPos > BSUtility.BYTE_BITS)
+                    if (destBitPos > BSUtility.BITS)
                     {
                         destBitPos = 1;
                         destBytePos--;
                     }
 
                     bitPos += remainingBits;
-                    if (bitPos > BSUtility.BYTE_BITS)
+                    if (bitPos > BSUtility.BITS)
                     {
                         bitPos = 1;
                         bytePos++;
@@ -408,7 +449,7 @@ namespace BSNet.Stream
                 {
                     data[destBytePos] |= (byte)(rawValue >> (remainingBits - bitsToConsume));
                     destBitPos += bitsToConsume;
-                    if (destBitPos > BSUtility.BYTE_BITS)
+                    if (destBitPos > BSUtility.BITS)
                     {
                         destBitPos = 1;
                         destBytePos--;

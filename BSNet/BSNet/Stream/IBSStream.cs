@@ -20,16 +20,16 @@ namespace BSNet.Stream
         byte[] PadToEnd();
 
         // Unsigned
-        byte SerializeByte(byte value = default(byte), int bitCount = sizeof(byte) * BSUtility.BYTE_BITS);
-        ushort SerializeUShort(ushort value = default(ushort), int bitCount = sizeof(ushort) * BSUtility.BYTE_BITS);
-        uint SerializeUInt(uint value = default(uint), int bitCount = sizeof(uint) * BSUtility.BYTE_BITS);
-        ulong SerializeULong(ulong value = default(ulong), int bitCount = sizeof(ulong) * BSUtility.BYTE_BITS);
+        byte SerializeByte(byte value = default(byte), int bitCount = sizeof(byte) * BSUtility.BITS);
+        ushort SerializeUShort(ushort value = default(ushort), int bitCount = sizeof(ushort) * BSUtility.BITS);
+        uint SerializeUInt(uint value = default(uint), int bitCount = sizeof(uint) * BSUtility.BITS);
+        ulong SerializeULong(ulong value = default(ulong), int bitCount = sizeof(ulong) * BSUtility.BITS);
 
         // Signed
-        sbyte SerializeSByte(sbyte value = default(sbyte), int bitCount = sizeof(sbyte) * BSUtility.BYTE_BITS);
-        short SerializeShort(short value = default(short), int bitCount = sizeof(short) * BSUtility.BYTE_BITS);
-        int SerializeInt(int value = default(int), int bitCount = sizeof(int) * BSUtility.BYTE_BITS);
-        long SerializeLong(long value = default(long), int bitCount = sizeof(long) * BSUtility.BYTE_BITS);
+        sbyte SerializeSByte(sbyte value = default(sbyte), int bitCount = sizeof(sbyte) * BSUtility.BITS);
+        short SerializeShort(short value = default(short), int bitCount = sizeof(short) * BSUtility.BITS);
+        int SerializeInt(int value = default(int), int bitCount = sizeof(int) * BSUtility.BITS);
+        long SerializeLong(long value = default(long), int bitCount = sizeof(long) * BSUtility.BITS);
 
         // Floating point
         float SerializeFloat(BoundedRange range, float value = default(float));

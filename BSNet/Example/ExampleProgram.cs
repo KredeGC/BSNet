@@ -83,19 +83,11 @@ namespace BSNet.Example
             byte[] fullBytes;
             using (NewWriter writer1 = NewWriter.GetWriter(1))
             {
-                writer1.SerializeUInt(uint.MaxValue, 10);
-                writer1.SerializeUInt(uint.MaxValue, 3);
-                writer1.SerializeUInt(uint.MaxValue, 11);
-                writer1.SerializeUInt(uint.MaxValue, 31);
-                //writer1.SerializeUInt(1, 1);
-                //writer1.SerializeUInt(273, 11);
-                //writer1.SerializeUInt(273, 17);
-                //writer1.SerializeUInt(uint.MaxValue, 14);
-                //writer1.SerializeUInt(511, 11);
-                //writer1.SerializeUInt(0b10101010111111111010101000001111, 32);
-                //writer1.SerializeUInt(273, 11);
-                //writer1.SerializeUInt(211, 10);
-                //writer1.SerializeUInt(126, 7);
+                writer1.SerializeUInt(1U, 1);
+                writer1.SerializeUInt(273U, 11);
+                writer1.SerializeUInt(273U, 17);
+                writer1.SerializeUInt(uint.MaxValue, 14);
+                writer1.SerializeUInt(511U, 9);
                 byte[] rawBytes = writer1.ToArray();
                 BSUtility.PrintBits(rawBytes);
 
@@ -110,51 +102,15 @@ namespace BSNet.Example
 
             using (NewReader reader = NewReader.GetReader(fullBytes))
             {
-                //Console.WriteLine(reader.SerializeUInt(0, 1));
-                Console.WriteLine(reader.SerializeUInt(0, 10));
-                Console.WriteLine(reader.SerializeUInt(0, 3));
+                Console.WriteLine(reader.SerializeUInt(0, 1));
                 Console.WriteLine(reader.SerializeUInt(0, 11));
-                Console.WriteLine(reader.SerializeUInt(0, 31));
-                //Console.WriteLine(reader.SerializeUInt(0, 32));
-                //Console.WriteLine(reader.SerializeUShort(0, 10));
-                //Console.WriteLine(reader.SerializeUShort(0, 7));
+                Console.WriteLine(reader.SerializeUInt(0, 17));
+                Console.WriteLine(reader.SerializeUInt(0, 14));
+                Console.WriteLine(reader.SerializeUInt(0, 9));
             }
 
             Console.ReadKey(true);
-
-            //BSWriter occupy1 = BSWriter.GetWriter(4);
-            //BSWriter occupy2 = BSWriter.GetWriter(3);
-            //BSWriter occupy3 = BSWriter.GetWriter(2);
-            //BSWriter.ReturnWriter(occupy1);
-            //BSWriter.ReturnWriter(occupy2);
-            //BSWriter.ReturnWriter(occupy3);
-
-            //byte[] fullBytes;
-            //using (BSWriter writer1 = BSWriter.GetWriter(1))
-            //{
-            //    writer1.SerializeUShort(273, 11);
-            //    byte[] rawBytes = writer1.ToArray();
-            //    Console.WriteLine(rawBytes[0]);
-            //    Console.WriteLine(rawBytes[1]);
-
-            //    using (BSWriter writer2 = BSWriter.GetWriter(2))
-            //    {
-            //        //writer2.SerializeBuffer(bitCount, rawBytes);
-            //        writer2.SerializeBytes(writer1.TotalBits, rawBytes);
-            //        Console.WriteLine(writer2.ToArray()[0]);
-            //        Console.WriteLine(writer2.ToArray()[1]);
-
-            //        fullBytes = writer2.ToArray();
-            //    }
-            //}
-
-            //using (BSReader reader = BSReader.GetReader(fullBytes))
-            //{
-            //    Console.WriteLine(reader.SerializeUShort(0, 11));
-            //}
-
-            //Console.ReadKey(true);
-
+            
 
             // Testing a P2P implementation
             //ExampleClient client1 = new ExampleClient(1609, "127.0.0.1", 1615);
