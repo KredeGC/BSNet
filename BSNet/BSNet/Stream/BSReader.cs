@@ -299,7 +299,7 @@ namespace BSNet.Stream
         }
 
         // Bytes
-        public byte[] SerializeBytes(int bitCount, byte[] data = null)
+        public byte[] SerializeBytes(int bitCount, byte[] data = null, bool trimRight = false)
         {
             Read(bitCount, out byte[] raw, (int)Math.Ceiling((double)bitCount / BSUtility.BITS));
             return raw;

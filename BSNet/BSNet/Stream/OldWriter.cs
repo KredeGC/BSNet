@@ -284,7 +284,7 @@ namespace BSNet.Stream
         }
 
         // Bytes
-        public byte[] SerializeBytes(int bitCount, byte[] data = null)
+        public byte[] SerializeBytes(int bitCount, byte[] data = null, bool trimRight = false)
         {
             byte[] raw = BSPool.GetBuffer(data.Length);
             Buffer.BlockCopy(data, 0, raw, 0, data.Length);

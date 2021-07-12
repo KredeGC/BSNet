@@ -302,31 +302,15 @@ namespace BSNet.Stream
         }
 
         // Bytes
-        public byte[] SerializeBytes(int bitCount, byte[] data = null)
-        {
-            byte[] raw = BSPool.GetBuffer(data.Length);
-            Buffer.BlockCopy(data, 0, raw, 0, data.Length);
-            Write(bitCount, raw);
-            BSPool.ReturnBuffer(raw);
-            return raw;
-        }
-
         public byte[] SerializeBytes(int bitCount, byte[] data = null, bool trimRight = false)
         {
-            int offset = data.Length * BSUtility.BITS - bitCount;
+            int offset = trimRight ? data.Length * BSUtility.BITS - bitCount : 0;
             byte[] raw = BSPool.GetBuffer(data.Length);
             Buffer.BlockCopy(data, 0, raw, 0, data.Length);
             Write(bitCount, raw, offset);
             BSPool.ReturnBuffer(raw);
             return raw;
         }
-
-        /*public byte[] SerializeBytes(int bitCount, byte[] data = null)
-        {
-            byte[] raw = BSUtility.TrimLeft(data, bitCount);
-            Write(bitCount, raw);
-            return raw;
-        }*/
 
         public byte[] SerializeBytes(byte[] data = null)
         {
@@ -337,6 +321,7 @@ namespace BSNet.Stream
             return raw;
         }
 
+        // Return internal stream
         public byte[] ToArray()
         {
             int size = (TotalBits - 1) / BSUtility.BITS + 1;
@@ -346,8 +331,14 @@ namespace BSNet.Stream
             return rawBytes;
         }
 
+        // Write internally
         private void Write(int bitCount, byte[] data, int offset = 0)
         {
+            if (bitCount == 0) return;
+
+            if (bitCount < 0)
+                throw new ArgumentOutOfRangeException("Attempting to write a negative amount");
+
             int expansion = bytePos + (bitPos - 1 + bitCount - 1) / BSUtility.BITS + 1;
 
             if (expansion > internalStream.Length)

@@ -302,21 +302,13 @@ namespace BSNet.Stream
         }
 
         // Bytes
-        public byte[] SerializeBytes(int bitCount, byte[] data = null)
+        public byte[] SerializeBytes(int bitCount, byte[] data = null, bool trimRight = false)
         {
             int size = (bitCount - 1) / BSUtility.BITS + 1;
             byte[] raw = BSPool.GetBuffer(size);
             Buffer.BlockCopy(data, 0, raw, 0, size);
             Write(bitCount, raw);
             BSPool.ReturnBuffer(raw);
-            return raw;
-        }
-
-        public byte[] SerializeBytes(int bitCount, byte[] data = null, int shift = 0)
-        {
-            int size = (bitCount - 1) / BSUtility.BITS + 1;
-            byte[] raw = BSUtility.BitShiftRight(data, size, shift);
-            Write(bitCount, raw);
             return raw;
         }
 

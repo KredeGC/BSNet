@@ -50,6 +50,6 @@ namespace BSNet.Stream
 
         // Bytes
         byte[] SerializeBytes(byte[] bytes = null);
-        byte[] SerializeBytes(int bitCount, byte[] bytes = null);
+        byte[] SerializeBytes(int bitCount, byte[] bytes = null, bool trimRight = false);
     }
 }

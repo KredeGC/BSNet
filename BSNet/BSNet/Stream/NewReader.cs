@@ -299,28 +299,26 @@ namespace BSNet.Stream
         }
 
         // Bytes
-        public byte[] SerializeBytes(int bitCount, byte[] data = null)
+        public byte[] SerializeBytes(int bitCount, byte[] data = null, bool trimRight = false)
         {
-            byte[] raw = Read(bitCount);
-            //Read(bitCount, out byte[] raw, (int)Math.Ceiling((double)bitCount / BSUtility.BYTE_BITS));
-            return raw;
+            return Read(bitCount);
         }
 
         public byte[] SerializeBytes(byte[] data = null)
         {
-            byte[] raw = Read(data.Length * BSUtility.BITS);
-            //Read(data.Length * BSUtility.BYTE_BITS, out byte[] raw, data.Length);
-            return raw;
+            return Read(data.Length * BSUtility.BITS);
         }
 
-
+        // Read internally
         private byte[] Read(int bitCount)
         {
-            if (bitCount <= 0)
-                return new byte[0];
+            if (bitCount == 0) return new byte[0];
+
+            if (bitCount < 0)
+                throw new ArgumentOutOfRangeException("Attempting to read a negative amount");
 
             if (bitCount > TotalBits)
-                throw new ArgumentOutOfRangeException("Requested bitCount larger than stream");
+                throw new ArgumentOutOfRangeException("Attempting to read further than stream");
 
             // The total length of the bytes
             int length = (bitCount - 1) / BSUtility.BITS + 1;
