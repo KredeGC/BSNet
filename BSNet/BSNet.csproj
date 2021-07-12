@@ -60,12 +60,14 @@
     <Compile Include="BSNet\Quantization\HalfPrecision.cs" />
     <Compile Include="BSNet\Quantization\SmallestThree.cs" />
     <Compile Include="BSNet\Stream\BSReader.cs" />
+    <Compile Include="BSNet\Stream\NewReader.cs" />
+    <Compile Include="BSNet\Stream\NewWriter.cs" />
     <Compile Include="BSNet\Stream\OldWriter.cs" />
     <Compile Include="BSNet\Stream\IBSStream.cs" />
-    <Compile Include="ExampleClient.cs" />
-    <Compile Include="ExamplePacket.cs" />
+    <Compile Include="Example\ExampleClient.cs" />
+    <Compile Include="Example\ExamplePacket.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="ExampleProgram.cs" />
+    <Compile Include="Example\ExampleProgram.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />

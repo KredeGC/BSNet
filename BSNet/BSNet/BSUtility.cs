@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
@@ -6,7 +7,7 @@ using System.Net.Sockets;
 
 namespace BSNet
 {
-    internal static class BSUtility
+    public static class BSUtility
     {
         public const int TIMEOUT = 10;
         public const int BYTE_BITS = 8;
@@ -123,6 +124,160 @@ namespace BSNet
                 }
             }
             return null;
+        }
+
+        /// <summary>
+        /// Shifts the bits in an array of bytes to the left.
+        /// </summary>
+        /// <param name="bytes">The byte array to shift.</param>
+        public static void ShiftLeft(byte[] bytes)
+        {
+            // Iterate through the elements of the array from left to right.
+            for (int index = 0; index < bytes.Length; index++)
+            {
+                // If the leftmost bit of the current byte is 1 then we have a carry.
+                bool carryFlag = (bytes[index] & 0x80) > 0;
+
+                if (index > 0)
+                {
+                    if (carryFlag == true)
+                    {
+                        // Apply the carry to the rightmost bit of the current bytes neighbor to the left.
+                        bytes[index - 1] = (byte)(bytes[index - 1] | 0x01);
+                    }
+                }
+
+                bytes[index] = (byte)(bytes[index] << 1);
+            }
+        }
+
+        /// <summary>
+        /// Shifts the bits in an array of bytes to the right.
+        /// </summary>
+        /// <param name="bytes">The byte array to shift.</param>
+        public static void ShiftRight(byte[] bytes)
+        {
+            int rightEnd = bytes.Length - 1;
+
+            // Iterate through the elements of the array right to left.
+            for (int index = rightEnd; index >= 0; index--)
+            {
+                // If the rightmost bit of the current byte is 1 then we have a carry.
+                bool carryFlag = (bytes[index] & 0x01) > 0;
+
+                if (index < rightEnd)
+                {
+                    if (carryFlag == true)
+                    {
+                        // Apply the carry to the leftmost bit of the current bytes neighbor to the right.
+                        bytes[index + 1] = (byte)(bytes[index + 1] | 0x80);
+                    }
+                }
+
+                bytes[index] = (byte)(bytes[index] >> 1);
+            }
+        }
+
+        public static byte[] Trim(byte[] rawBytes, int start, int bitCount)
+        {
+            int length = (bitCount - 1) / BYTE_BITS + 1;
+            byte[] shiftedBytes = new byte[length];
+            int leftShift = start % 8;
+            int rightShift = 8 - leftShift;
+            int skip = start / 8;
+
+            for (int i = 0; i < length; i++)
+            {
+                if (i + skip < rawBytes.Length) // Remove
+                    shiftedBytes[i] = (byte)(rawBytes[i + skip] << leftShift);
+
+                if (i + skip + 1 < rawBytes.Length)
+                    shiftedBytes[i] |= (byte)(rawBytes[i + skip + 1] >> rightShift);
+            }
+
+            return shiftedBytes;
+        }
+
+        public static byte[] TrimLeft(byte[] rawBytes, int bitCount)
+        {
+            int length = (bitCount - 1) / BYTE_BITS + 1;
+            byte[] shiftedBytes = new byte[length];
+            int leftShift = (8 - bitCount % 8) % 8;
+            int rightShift = 8 - leftShift;
+            int skip = (rawBytes.Length * BYTE_BITS - bitCount) / 8;
+
+            for (int i = 0; i < length; i++)
+            {
+                shiftedBytes[i] = (byte)(rawBytes[i + skip] << leftShift);
+
+                int t1 = shiftedBytes[i];
+                int t = shiftedBytes[i];
+
+                if (i < length - 1)
+                    shiftedBytes[i] |= (byte)(rawBytes[i + skip + 1] >> rightShift);
+            }
+
+            return shiftedBytes;
+        }
+
+        public static void PrintBits(byte[] data)
+        {
+            int[] fields = new int[8];
+            for (int i = 0; i < 8; i++)
+                fields[i] = 1 << (7 - i);
+
+            //{
+            //    0b00000001,
+            //    0b00000010,
+            //    0b00000100,
+            //    0b00001000,
+            //    0b00010000,
+            //    0b00100000,
+            //    0b01000000,
+            //    0b10000000,
+            //};
+
+            string str = string.Empty;
+            for (int i = 0; i < data.Length; i++)
+            {
+                for (int j = 0; j < fields.Length; j++)
+                    str += (data[i] & fields[j]) > 0 ? 1 : 0;
+                str += " ";
+            }
+            Console.WriteLine(str);
+        }
+
+        public static byte[] BitShiftLeft(byte[] rawBytes, int length, int shift)
+        {
+            byte[] shiftedBytes = new byte[length];
+            int shiftRemainder = shift % 8;
+            int skip = shift / 8;
+            
+            for (int i = 0; i < length; i++)
+            {
+                shiftedBytes[i] = (byte)(rawBytes[i + skip] << shiftRemainder);
+
+                if (i < length - 1)
+                    shiftedBytes[i] |= (byte)(rawBytes[i + skip + 1] >> 8 - shiftRemainder);
+            }
+
+            return shiftedBytes;
+        }
+
+        public static byte[] BitShiftRight(byte[] rawBytes, int length, int shift)
+        {
+            byte[] shiftedBytes = new byte[length];
+            int shiftRemainder = shift % 8;
+
+            for (int i = 0; i < length; i++)
+            {
+                shiftedBytes[i] = (byte)(rawBytes[i] >> shiftRemainder);
+
+                if (i > 0)
+                    shiftedBytes[i] |= (byte)(rawBytes[i - 1] << 8 - shift);
+            }
+
+            return shiftedBytes;
         }
 
         /// <summary>
