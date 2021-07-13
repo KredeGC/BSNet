@@ -57,7 +57,7 @@ namespace BSNet.Stream
 
         protected virtual void Dispose(bool disposing)
         {
-            ReturnWriter(this);
+            Return(this);
         }
 
         /// <summary>
@@ -65,7 +65,7 @@ namespace BSNet.Stream
         /// </summary>
         /// <param name="length">The initial capacity in bytes</param>
         /// <returns>A new writer</returns>
-        public static BSWriter GetWriter(int length = 0)
+        public static BSWriter Get(int length = 0)
         {
             lock (writerPool)
             {
@@ -89,7 +89,7 @@ namespace BSNet.Stream
         /// Returns the given writer into the pool for later use
         /// </summary>
         /// <param name="writer">The writer to return</param>
-        public static void ReturnWriter(BSWriter writer)
+        public static void Return(BSWriter writer)
         {
             lock (writerPool)
             {
@@ -129,8 +129,8 @@ namespace BSNet.Stream
         // Padding
         public byte[] PadToEnd()
         {
-            int remaining = (BSUtility.RECEIVE_BUFFER_SIZE - 4) * BSUtility.BITS - TotalBits;
-            byte[] padding = new byte[BSUtility.RECEIVE_BUFFER_SIZE];
+            int remaining = (BSUtility.PACKET_MAX_SIZE - 4) * BSUtility.BITS - TotalBits;
+            byte[] padding = new byte[BSUtility.PACKET_MAX_SIZE];
             SerializeBytes(remaining, padding);
             return padding;
         }
@@ -304,10 +304,10 @@ namespace BSNet.Stream
         // Bytes
         public byte[] SerializeBytes(int bitCount, byte[] data = null, bool trimRight = false)
         {
-            int size = (bitCount - 1) / BSUtility.BITS + 1;
-            byte[] raw = BSPool.GetBuffer(size);
-            Buffer.BlockCopy(data, 0, raw, 0, size);
-            Write(bitCount, raw);
+            int offset = trimRight ? data.Length * BSUtility.BITS - bitCount : 0;
+            byte[] raw = BSPool.GetBuffer(data.Length);
+            Buffer.BlockCopy(data, 0, raw, 0, data.Length);
+            Write(bitCount, raw, offset);
             BSPool.ReturnBuffer(raw);
             return raw;
         }
@@ -321,35 +321,7 @@ namespace BSNet.Stream
             return raw;
         }
 
-        // TODO: Do the opposite
-        // This doesn't work for more than single bytes
-        // Make a method like SerializeBytes that appends spaces in front, if bitCount isn't right
-        public byte[] ToBytes()
-        {
-            int remainder = 8 - (bitPos - 1);
-
-            if (remainder < 8)
-            {
-                byte[] rawBytes;
-                using (BSWriter writer = GetWriter())
-                {
-                    writer.SerializeByte(0, remainder);
-                    writer.SerializeBytes(ToArray());
-
-                    int size = (TotalBits - remainder - 1) / BSUtility.BITS + 1;
-
-                    byte[] raw = writer.ToArray();
-                    rawBytes = new byte[size];
-
-                    Buffer.BlockCopy(raw, 0, rawBytes, 0, size);
-                }
-
-                return rawBytes;
-            }
-
-            return ToArray();
-        }
-
+        // Return internal stream
         public byte[] ToArray()
         {
             int size = (TotalBits - 1) / BSUtility.BITS + 1;
@@ -359,7 +331,93 @@ namespace BSNet.Stream
             return rawBytes;
         }
 
-        private void Write(int bitCount, byte[] data)
+        // Write internally
+        private void Write(int bitCount, byte[] data, int offset = 0)
+        {
+            if (bitCount == 0) return;
+
+            if (bitCount < 0)
+                throw new ArgumentOutOfRangeException("Attempting to write a negative amount");
+
+            int expansion = bytePos + (bitPos - 1 + bitCount - 1) / BSUtility.BITS + 1;
+
+            if (expansion > internalStream.Length)
+            {
+                byte[] bytes = BSPool.GetBuffer(expansion);
+                Buffer.BlockCopy(internalStream, 0, bytes, 0, internalStream.Length);
+
+                BSPool.ReturnBuffer(internalStream);
+
+                internalStream = bytes;
+            }
+
+            // Length of the data
+            int byteCountCeil = (bitCount - 1 + bitPos - 1) / BSUtility.BITS + 1;
+            int totalOffset = data.Length * BSUtility.BITS - bitCount - offset; // 21
+
+            // The offset to shift by
+            int leftShift = totalOffset % BSUtility.BITS; // 5
+            int rightShift = BSUtility.BITS - leftShift; // 3
+            int skip = totalOffset / BSUtility.BITS; // 2
+            byte leftValue = 0;
+
+            // Go through the data
+            for (int i = 0; i < byteCountCeil; i++)
+            {
+                // Add bits from the firs part, shifted by offset
+                byte value = 0;
+                if (i + skip < data.Length)
+                    value |= (byte)(data[i + skip] << leftShift);
+
+                // Add bits from the second part, shifted by 8 - offset
+                if (i + skip + 1 < data.Length)
+                    value |= (byte)(data[i + skip + 1] >> rightShift);
+
+                if (bitPos > 1)
+                {
+                    byte original = value;
+
+                    // Shift to the right to correct the data
+                    value = (byte)(value >> bitPos - 1);
+
+                    // Shift part of the value on the left into this value
+                    if (i + skip - 1 >= 0)
+                        value |= (byte)(leftValue << BSUtility.BITS - (bitPos - 1));
+
+                    leftValue = original;
+                }
+
+                internalStream[bytePos + i] |= value;
+            }
+
+            // Offset read count by bitCount
+            bytePos += bitCount / BSUtility.BITS;
+            bitPos += bitCount % BSUtility.BITS;
+            if (bitPos > BSUtility.BITS)
+            {
+                bitPos -= BSUtility.BITS;
+                bytePos++;
+            }
+
+            //int totalBits = bitCount + bitPos - 1 + offset;
+            //int byteCeil = (totalBits - 1) / BSUtility.BYTE_BITS + 1;
+            //byte[] shiftedData = BSUtility.Trim(data, 0, bitCount);
+
+            //internalStream[bytePos] |= shiftedData[0];
+
+            //for (int i = 1; i < shiftedData.Length; i++)
+            //    internalStream[bytePos + i] = shiftedData[i];
+
+            //bytePos += bitCount / BSUtility.BYTE_BITS;
+            //bitPos += bitCount % BSUtility.BYTE_BITS;
+            //if (bitPos > BSUtility.BYTE_BITS)
+            //{
+            //    bitPos -= BSUtility.BYTE_BITS;
+            //    bytePos++;
+            //}
+        }
+
+        private void WriteOld(int bitCount, byte[] data)
         {
             // Expand the stream
             int expansion = bytePos + (bitPos - 1 + bitCount - 1) / BSUtility.BITS + 1;

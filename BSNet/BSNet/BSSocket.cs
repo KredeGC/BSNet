@@ -47,13 +47,13 @@ namespace BSNet
         protected bool _disposing;
 
         // P2P Protocol
-        protected const int headerSize =
-            sizeof(uint) + // CRC32 of version + packet (4 bytes)
-            sizeof(byte) + // ConnectionType (2 bits)
-            sizeof(ushort) + // Sequence of this packet (2 bytes)
-            sizeof(ushort) + // Acknowledgement for most recent received packet (2 bytes)
-            sizeof(uint) + // Bitfield of acknowledgements before most recent (4 bytes)
-            sizeof(ulong); // Token or LocalToken if not authenticated (8 bytes)
+        //protected const int headerSize =
+        //    sizeof(uint) + // CRC32 of version + packet (4 bytes)
+        //    sizeof(byte) + // ConnectionType (2 bits)
+        //    sizeof(ushort) + // Sequence of this packet (2 bytes)
+        //    sizeof(ushort) + // Acknowledgement for most recent received packet (2 bytes)
+        //    sizeof(uint) + // Bitfield of acknowledgements before most recent (4 bytes)
+        //    sizeof(ulong); // Token or LocalToken if not authenticated (8 bytes)
 
         // Network statistics
         protected double nextBip;
@@ -96,12 +96,19 @@ namespace BSNet
             Dispose(false);
         }
 
+        /// <summary>
+        /// Disposes of this socket and tries to gracefully disconnect with any connected endPoints
+        /// </summary>
         public virtual void Dispose()
         {
             Dispose(true);
             GC.SuppressFinalize(this);
         }
 
+        /// <summary>
+        /// Disposes of this socket and tries to gracefully disconnect with any connected endPoints
+        /// </summary>
+        /// <param name="disposing">Whether to disconnect gracefully</param>
         protected virtual void Dispose(bool disposing)
         {
             if (!_disposing)
@@ -120,7 +127,7 @@ namespace BSNet
         }
 
         /// <summary>
-        /// Called to handle incoming messages at the given tickrate
+        /// Handles incoming messages at the given tickrate
         /// </summary>
         public virtual void Update()
         {
@@ -159,9 +166,9 @@ namespace BSNet
         }
 
         /// <summary>
-        /// Sends a packet, wanting to disconnect
+        /// Attempts to end the connection with the endPoint
         /// </summary>
-        /// <param name="endPoint">The endPoint to establish a connection with</param>
+        /// <param name="endPoint">The endPoint to end the connection with</param>
         public virtual void Disconnect(EndPoint endPoint)
         {
             if (connections.TryGetValue(endPoint, out ClientConnection connection))
@@ -250,7 +257,7 @@ namespace BSNet
         }
 
         /// <summary>
-        /// Send an acknowledgement back to the given endPoint
+        /// Sends a heartbeat message to an endPoint, keeping the connection alive
         /// </summary>
         /// <param name="connection">The connection to send it to</param>
         protected virtual void SendHeartbeat(ClientConnection connection)
@@ -262,6 +269,7 @@ namespace BSNet
         /// <summary>
         /// Sends a raw message to the given endPoint
         /// </summary>
+        /// <exception cref="System.ArgumentOutOfRangeException"/>
         /// <param name="connection">The connection to send it to</param>
         /// <param name="type">The type of connection to send</param>
         /// <param name="token">The token to send with it</param>
@@ -273,7 +281,7 @@ namespace BSNet
             connection.IncrementSequence(ElapsedTime);
 
             byte[] rawBytes;
-            using (BSWriter writer = BSWriter.GetWriter(headerSize))
+            using (BSWriter writer = BSWriter.Get(BSUtility.PACKET_MIN_SIZE))
             {
                 // Write header data
                 using (Header header = Header.GetHeader(type,
@@ -292,7 +300,7 @@ namespace BSNet
                 rawBytes = writer.ToArray();
             }
 
-            if (rawBytes.Length > BSUtility.RECEIVE_BUFFER_SIZE)
+            if (rawBytes.Length > BSUtility.PACKET_MAX_SIZE)
                 throw new ArgumentOutOfRangeException("Packet size too big");
 
             try
@@ -330,7 +338,7 @@ namespace BSNet
         }
 
         /// <summary>
-        /// Called to handle a specified message in raw byte format
+        /// Handles a given message in raw byte format and returns it to the application if necessary
         /// </summary>
         /// <param name="rawBytes">The bytes to handle</param>
         /// <param name="length">Length of the byte array</param>
@@ -339,7 +347,7 @@ namespace BSNet
             inComingBipS += length * 8;
 
             // The length is less than the header, certainly malicious
-            if (length < headerSize)
+            if (length < BSUtility.PACKET_MIN_SIZE)
             {
                 // Don't return the buffer, we hopefully won't be needing it again
                 // BSPool.ReturnBuffer(rawBytes);
@@ -347,7 +355,7 @@ namespace BSNet
             }
 
             // Read the buffer and determine CRC
-            using (BSReader reader = BSReader.GetReader(rawBytes, length))
+            using (BSReader reader = BSReader.Get(rawBytes, length))
             {
                 if (!reader.SerializeChecksum(ProtocolVersion))
                 {
@@ -361,7 +369,7 @@ namespace BSNet
                     // Handle the message
                     if (header.Type == ConnectionType.CONNECT) // If this endPoint wants to establish connection
                     {
-                        if (length == BSUtility.RECEIVE_BUFFER_SIZE) // Make sure this message has been padded
+                        if (length == BSUtility.PACKET_MAX_SIZE) // Make sure this message has been padded to avoid DDos amplification
                         {
                             if (connections.TryGetValue(endPoint, out ClientConnection connection))
                             {
@@ -424,7 +432,7 @@ namespace BSNet
                                             Packet.ReturnPacket(packet);
                                             unsentMessages.Remove(conSeq);
                                         }
-                                        // OnMessageAcknowledged(seq);
+                                        OnMessageAcknowledged(seq);
                                     }
                                 }
 
@@ -446,7 +454,7 @@ namespace BSNet
         }
 
         /// <summary>
-        /// Called, preferably in another thread, to receive packets from other endPoints
+        /// Receives packets from other endPoints and handles them
         /// </summary>
         protected virtual void ReceiveMessages()
         {
@@ -468,7 +476,7 @@ namespace BSNet
                 EndPoint endPoint = new IPEndPoint(IPAddress.Any, 0);
 
                 // Get packets from other endpoints
-                byte[] rawBytes = BSPool.GetBuffer(BSUtility.RECEIVE_BUFFER_SIZE);
+                byte[] rawBytes = BSPool.GetBuffer(BSUtility.PACKET_MAX_SIZE);
                 int length = socket.ReceiveFrom(rawBytes, ref endPoint);
 
 #if NETWORK_DEBUG
@@ -476,6 +484,7 @@ namespace BSNet
                 if (SimulatedPacketLoss > 0 && random.Next(1000) < SimulatedPacketLoss)
                     continue;
 
+                // Simulate packet latency
                 if (SimulatedPacketLatency > 0)
                 {
                     Packet packet = Packet.GetPacket(endPoint, rawBytes, length, ElapsedTime + SimulatedPacketLatency / 1000d);
@@ -492,7 +501,7 @@ namespace BSNet
 
             double timeout = ElapsedTime - BSUtility.TIMEOUT;
             double resendTime = ElapsedTime - TickRate * 32d;
-            double beatTime = ElapsedTime;
+            double beatTime = ElapsedTime - TickRate;
 
             // Set up lists
             lastTimedOut.Clear();
@@ -523,7 +532,7 @@ namespace BSNet
                 {
                     // Get CRC
                     byte[] rawBytes = unsentMessages[data.Key].Bytes;
-                    using (BSReader reader = BSReader.GetReader(rawBytes))
+                    using (BSReader reader = BSReader.Get(rawBytes))
                     {
                         reader.SerializeChecksum(ProtocolVersion);
 
@@ -591,10 +600,31 @@ namespace BSNet
             Log($"Incoming bits in the last second: {inComingBipS / 1000f} Kbits/S", LogLevel.Info);*/
         }
 
+        /// <summary>
+        /// Called when this socket receives an acknowledgement for a previously sent message, with the given sequence number
+        /// <para/>Note: This callback runs every time an acknowledgement is received, which can happen up to 33 times per message
+        /// </summary>
+        /// <param name="sequence">The sequence number that was acknowledged</param>
+        protected virtual void OnMessageAcknowledged(ushort sequence) { }
+
+        /// <summary>
+        /// Called when a connection is established with a remote endPoint
+        /// </summary>
+        /// <param name="endPoint">The address of the endPoint which established connection</param>
         protected abstract void OnConnect(IPEndPoint endPoint);
 
+        /// <summary>
+        /// Called when a connection with a remote endPoint is lost
+        /// </summary>
+        /// <param name="endPoint">The address of the lost endPoint</param>
         protected abstract void OnDisconnect(IPEndPoint endPoint);
 
+        /// <summary>
+        /// Called when this socket receives a packet from another, connected and authenticated endPoint
+        /// </summary>
+        /// <param name="endPoint">The address of the socket that sent the message</param>
+        /// <param name="sequence">The sequence number of the received message</param>
+        /// <param name="reader">The stream, used to deserialize the contents of the message</param>
         protected abstract void OnReceiveMessage(IPEndPoint endPoint, ushort sequence, IBSStream reader);
     }
 }

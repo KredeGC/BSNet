@@ -71,7 +71,7 @@ public class Client : BSSocket
     }
 	
     // Called when we receive a message from this IPEndPoint
-    protected override void OnReceiveMessage(IPEndPoint endPoint, IBSStream reader)
+    protected override void OnReceiveMessage(IPEndPoint endPoint, ushort sequence, IBSStream reader)
     {
         // Receive the message, "Hello network!", from the other end
         string message = reader.SerializeString(encoding);

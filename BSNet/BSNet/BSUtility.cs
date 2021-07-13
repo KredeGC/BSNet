@@ -1,4 +1,5 @@
-﻿using System;
+﻿using BSNet.Datagram;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -9,10 +10,14 @@ namespace BSNet
 {
     public static class BSUtility
     {
-        public const int TIMEOUT = 10;
-        public const int BITS = 8;
-        public const int RTT_BUFFER_SIZE = 256;
-        public const int RECEIVE_BUFFER_SIZE = 1024;
+        public const int TIMEOUT = 10; // Timeout for connections
+        public const int BITS = 8; // Bits in a byte
+        public const int RTT_BUFFER_SIZE = 64; // Double the size of AckBits
+        
+        public const int PACKET_MIN_SIZE =
+            sizeof(uint) + // CRC32 of version + packet (4 bytes)
+            Header.HEADER_SIZE; // Header
+        public const int PACKET_MAX_SIZE = 1024;
 
         private static readonly byte[] sBitMasks;
 
@@ -127,99 +132,10 @@ namespace BSNet
         }
 
         /// <summary>
-        /// Shifts the bits in an array of bytes to the left.
+        /// Visualize the bits in the given byte-array
         /// </summary>
-        /// <param name="bytes">The byte array to shift.</param>
-        public static void ShiftLeft(byte[] bytes)
-        {
-            // Iterate through the elements of the array from left to right.
-            for (int index = 0; index < bytes.Length; index++)
-            {
-                // If the leftmost bit of the current byte is 1 then we have a carry.
-                bool carryFlag = (bytes[index] & 0x80) > 0;
-
-                if (index > 0)
-                {
-                    if (carryFlag == true)
-                    {
-                        // Apply the carry to the rightmost bit of the current bytes neighbor to the left.
-                        bytes[index - 1] = (byte)(bytes[index - 1] | 0x01);
-                    }
-                }
-
-                bytes[index] = (byte)(bytes[index] << 1);
-            }
-        }
-
-        /// <summary>
-        /// Shifts the bits in an array of bytes to the right.
-        /// </summary>
-        /// <param name="bytes">The byte array to shift.</param>
-        public static void ShiftRight(byte[] bytes)
-        {
-            int rightEnd = bytes.Length - 1;
-
-            // Iterate through the elements of the array right to left.
-            for (int index = rightEnd; index >= 0; index--)
-            {
-                // If the rightmost bit of the current byte is 1 then we have a carry.
-                bool carryFlag = (bytes[index] & 0x01) > 0;
-
-                if (index < rightEnd)
-                {
-                    if (carryFlag == true)
-                    {
-                        // Apply the carry to the leftmost bit of the current bytes neighbor to the right.
-                        bytes[index + 1] = (byte)(bytes[index + 1] | 0x80);
-                    }
-                }
-
-                bytes[index] = (byte)(bytes[index] >> 1);
-            }
-        }
-
-        public static byte[] Trim(byte[] rawBytes, int start, int bitCount)
-        {
-            int length = (bitCount - 1) / BITS + 1;
-            byte[] shiftedBytes = new byte[length];
-            int leftShift = start % 8;
-            int rightShift = 8 - leftShift;
-            int skip = start / 8;
-
-            for (int i = 0; i < length; i++)
-            {
-                if (i + skip < rawBytes.Length) // Remove
-                    shiftedBytes[i] = (byte)(rawBytes[i + skip] << leftShift);
-
-                if (i + skip + 1 < rawBytes.Length)
-                    shiftedBytes[i] |= (byte)(rawBytes[i + skip + 1] >> rightShift);
-            }
-
-            return shiftedBytes;
-        }
-
-        public static byte[] TrimLeft(byte[] rawBytes, int bitCount)
-        {
-            int length = (bitCount - 1) / BITS + 1;
-            byte[] shiftedBytes = new byte[length];
-            int leftShift = (8 - bitCount % 8) % 8;
-            int rightShift = 8 - leftShift;
-            int skip = (rawBytes.Length * BITS - bitCount) / 8;
-
-            for (int i = 0; i < length; i++)
-            {
-                shiftedBytes[i] = (byte)(rawBytes[i + skip] << leftShift);
-
-                int t1 = shiftedBytes[i];
-                int t = shiftedBytes[i];
-
-                if (i < length - 1)
-                    shiftedBytes[i] |= (byte)(rawBytes[i + skip + 1] >> rightShift);
-            }
-
-            return shiftedBytes;
-        }
-
+        /// <param name="data">The byte-array to show the bits of</param>
+        /// <returns>A string visualizing the bits in the byte-array</returns>
         public static string GetBits(byte[] data)
         {
             int[] fields = new int[8];
@@ -238,42 +154,13 @@ namespace BSNet
             return str;
         }
 
+        /// <summary>
+        /// Print the bits in the given byte-array to the console output
+        /// </summary>
+        /// <param name="data">The byte-array to show the bits of</param>
         public static void PrintBits(byte[] data)
         {
             Console.WriteLine(GetBits(data));
-        }
-
-        public static byte[] BitShiftLeft(byte[] rawBytes, int length, int shift)
-        {
-            byte[] shiftedBytes = new byte[length];
-            int shiftRemainder = shift % 8;
-            int skip = shift / 8;
-
-            for (int i = 0; i < length; i++)
-            {
-                shiftedBytes[i] = (byte)(rawBytes[i + skip] << shiftRemainder);
-
-                if (i < length - 1)
-                    shiftedBytes[i] |= (byte)(rawBytes[i + skip + 1] >> 8 - shiftRemainder);
-            }
-
-            return shiftedBytes;
-        }
-
-        public static byte[] BitShiftRight(byte[] rawBytes, int length, int shift)
-        {
-            byte[] shiftedBytes = new byte[length];
-            int shiftRemainder = shift % 8;
-
-            for (int i = 0; i < length; i++)
-            {
-                shiftedBytes[i] = (byte)(rawBytes[i] >> shiftRemainder);
-
-                if (i > 0)
-                    shiftedBytes[i] |= (byte)(rawBytes[i - 1] << 8 - shift);
-            }
-
-            return shiftedBytes;
         }
 
         /// <summary>

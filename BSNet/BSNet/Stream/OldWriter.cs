@@ -41,7 +41,7 @@ namespace BSNet.Stream
         public void Dispose()
         {
             GC.SuppressFinalize(this);
-            ReturnWriter(this);
+            Return(this);
         }
 
         /// <summary>
@@ -49,7 +49,7 @@ namespace BSNet.Stream
         /// </summary>
         /// <param name="length">The initial capacity</param>
         /// <returns>A new writer</returns>
-        public static OldWriter GetWriter(int length = 0)
+        public static OldWriter Get(int length = 0)
         {
             lock (writerPool)
             {
@@ -72,7 +72,7 @@ namespace BSNet.Stream
         /// Returns the given writer into the pool for later use
         /// </summary>
         /// <param name="writer">The writer to return</param>
-        public static void ReturnWriter(OldWriter writer)
+        public static void Return(OldWriter writer)
         {
             lock (writerPool)
             {
@@ -111,8 +111,8 @@ namespace BSNet.Stream
         // Padding
         public byte[] PadToEnd()
         {
-            int remaining = (BSUtility.RECEIVE_BUFFER_SIZE - 4) * BSUtility.BITS - TotalBits;
-            byte[] padding = new byte[BSUtility.RECEIVE_BUFFER_SIZE];
+            int remaining = (BSUtility.PACKET_MAX_SIZE - 4) * BSUtility.BITS - TotalBits;
+            byte[] padding = new byte[BSUtility.PACKET_MAX_SIZE];
             SerializeBytes(remaining, padding);
             return padding;
         }

@@ -15,13 +15,13 @@ namespace BSNetTest
         [TestMethod]
         public void WriterPoolTest()
         {
-            NewWriter occupy1 = NewWriter.GetWriter(4);
-            NewWriter occupy2 = NewWriter.GetWriter(4);
+            BSWriter occupy1 = BSWriter.Get(4);
+            BSWriter occupy2 = BSWriter.Get(4);
 
             Assert.AreNotSame(occupy1, occupy2);
 
-            NewWriter.ReturnWriter(occupy1);
-            NewWriter.ReturnWriter(occupy2);
+            BSWriter.Return(occupy1);
+            BSWriter.Return(occupy2);
         }
 
         /// <summary>
@@ -33,13 +33,13 @@ namespace BSNetTest
         {
             byte[] rawBytes = new byte[1];
 
-            NewReader occupy1 = NewReader.GetReader(rawBytes);
-            NewReader occupy2 = NewReader.GetReader(rawBytes);
+            BSReader occupy1 = BSReader.Get(rawBytes);
+            BSReader occupy2 = BSReader.Get(rawBytes);
 
             Assert.AreNotSame(occupy1, occupy2);
 
-            NewReader.ReturnReader(occupy1);
-            NewReader.ReturnReader(occupy2);
+            BSReader.Return(occupy1);
+            BSReader.Return(occupy2);
         }
 
         /// <summary>
@@ -49,7 +49,7 @@ namespace BSNetTest
         [TestMethod]
         public void NestedWriterTest()
         {
-            using (NewWriter writer1 = NewWriter.GetWriter())
+            using (BSWriter writer1 = BSWriter.Get())
             {
                 // Write some bits
                 writer1.SerializeUInt(273U, 11);
@@ -57,7 +57,7 @@ namespace BSNetTest
                 writer1.SerializeUInt(273U, 11);
                 byte[] writer1Bytes = writer1.ToArray();
 
-                using (NewWriter writer2 = NewWriter.GetWriter())
+                using (BSWriter writer2 = BSWriter.Get())
                 {
                     // Take that byte array and write it directly int a new writer
                     writer2.SerializeBytes(writer1.TotalBits, writer1Bytes, true);
@@ -81,7 +81,7 @@ namespace BSNetTest
         public void PrecisionReadWriteTest()
         {
             byte[] rawBytes;
-            using (NewWriter writer = NewWriter.GetWriter())
+            using (BSWriter writer = BSWriter.Get())
             {
                 writer.SerializeUInt(1U, 1);
                 writer.SerializeUInt(273U, 11);
@@ -94,7 +94,7 @@ namespace BSNetTest
                 rawBytes = writer.ToArray();
             }
 
-            using (NewReader reader = NewReader.GetReader(rawBytes))
+            using (BSReader reader = BSReader.Get(rawBytes))
             {
                 Assert.AreEqual(1U, reader.SerializeUInt(0, 1));
                 Assert.AreEqual(273U, reader.SerializeUInt(0, 11));
@@ -116,7 +116,7 @@ namespace BSNetTest
         {
             // Write some random bits
             byte[] rawBytes;
-            using (NewWriter writer1 = NewWriter.GetWriter(1))
+            using (BSWriter writer1 = BSWriter.Get(1))
             {
                 writer1.SerializeUInt(uint.MaxValue, 10);
                 writer1.SerializeUInt(uint.MaxValue, 3);
@@ -126,7 +126,7 @@ namespace BSNetTest
             }
 
             // Read those bits back
-            using (NewReader reader = NewReader.GetReader(rawBytes))
+            using (BSReader reader = BSReader.Get(rawBytes))
             {
                 Assert.AreEqual(1023U, reader.SerializeUInt(0, 10));
                 Assert.AreEqual(7U, reader.SerializeUInt(0, 3));
@@ -143,7 +143,7 @@ namespace BSNetTest
         public void UIntRangeReadWriteTest()
         {
             byte[] rawBytes;
-            using (NewWriter writer = NewWriter.GetWriter())
+            using (BSWriter writer = BSWriter.Get())
             {
                 uint value = 1;
                 for (int i = 1; i <= 32; i++)
@@ -164,7 +164,7 @@ namespace BSNetTest
                 Assert.AreEqual(expectedByteSize, rawBytes.Length);
             }
             
-            using (NewReader reader = NewReader.GetReader(rawBytes))
+            using (BSReader reader = BSReader.Get(rawBytes))
             {
                 uint value = 1;
                 for (int i = 1; i <= 32; i++)

@@ -49,7 +49,6 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="BSUtilityTest.cs" />
     <Compile Include="HeaderTest.cs" />
     <Compile Include="StreamTest.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

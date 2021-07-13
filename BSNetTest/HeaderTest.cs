@@ -21,7 +21,7 @@ namespace BSNetTest
             uint randomValue = 0xBEEBB00B;
 
             byte[] rawBytes;
-            using (NewWriter writer = NewWriter.GetWriter(Header.HEADER_SIZE))
+            using (BSWriter writer = BSWriter.Get(Header.HEADER_SIZE))
             {
                 using (Header header = Header.GetHeader(type, sequence, ack, ackBits, token))
                 {
@@ -35,7 +35,7 @@ namespace BSNetTest
 
             Assert.AreEqual(rawBytes.Length, Header.HEADER_SIZE + 4);
 
-            using (NewReader reader = NewReader.GetReader(rawBytes))
+            using (BSReader reader = BSReader.Get(rawBytes))
             {
                 using (Header header = Header.GetHeader(reader))
                 {
@@ -61,7 +61,7 @@ namespace BSNetTest
             ulong token = 0xC0DECAFEBEEBB00B;
 
             byte[] rawBytes;
-            using (NewWriter writer = NewWriter.GetWriter(Header.HEADER_SIZE))
+            using (BSWriter writer = BSWriter.Get(Header.HEADER_SIZE))
             {
                 using (Header header = Header.GetHeader(type, sequence, ack, ackBits, token))
                 {
@@ -75,9 +75,9 @@ namespace BSNetTest
                 rawBytes = writer.ToArray();
             }
 
-            Assert.AreEqual(rawBytes.Length, BSUtility.RECEIVE_BUFFER_SIZE);
+            Assert.AreEqual(rawBytes.Length, BSUtility.PACKET_MAX_SIZE);
 
-            using (NewReader reader = NewReader.GetReader(rawBytes))
+            using (BSReader reader = BSReader.Get(rawBytes))
             {
                 Assert.IsTrue(reader.SerializeChecksum(version));
 

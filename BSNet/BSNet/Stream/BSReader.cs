@@ -50,7 +50,7 @@ namespace BSNet.Stream
 
         protected virtual void Dispose(bool disposing)
         {
-            ReturnReader(this);
+            Return(this);
         }
 
         /// <summary>
@@ -58,9 +58,9 @@ namespace BSNet.Stream
         /// </summary>
         /// <param name="byteStream">The bytes to read from</param>
         /// <returns>A new reader</returns>
-        public static BSReader GetReader(byte[] byteStream)
+        public static BSReader Get(byte[] byteStream)
         {
-            return GetReader(byteStream, byteStream.Length);
+            return Get(byteStream, byteStream.Length);
         }
 
         /// <summary>
@@ -69,7 +69,7 @@ namespace BSNet.Stream
         /// <param name="byteStream">The bytestream to read from</param>
         /// <param name="length">The length of the bytes</param>
         /// <returns>A new reader</returns>
-        public static BSReader GetReader(byte[] byteStream, int length)
+        public static BSReader Get(byte[] byteStream, int length)
         {
             lock (readerPool)
             {
@@ -94,7 +94,7 @@ namespace BSNet.Stream
         /// Returns the given reader into the pool for later use
         /// </summary>
         /// <param name="reader">The reader to return</param>
-        public static void ReturnReader(BSReader reader)
+        public static void Return(BSReader reader)
         {
             lock (readerPool)
             {
@@ -132,7 +132,7 @@ namespace BSNet.Stream
                     return false;
                 }
             }
-            
+
             BSPool.ReturnBuffer(internalStream);
 
             internalStream = data;
@@ -146,7 +146,7 @@ namespace BSNet.Stream
         // Padding
         public byte[] PadToEnd()
         {
-            int remaining = (BSUtility.RECEIVE_BUFFER_SIZE - 4) * BSUtility.BITS - TotalBits;
+            int remaining = (BSUtility.PACKET_MAX_SIZE - 4) * BSUtility.BITS - TotalBits;
             byte[] padding = SerializeBytes(remaining);
             return padding;
         }
@@ -301,14 +301,88 @@ namespace BSNet.Stream
         // Bytes
         public byte[] SerializeBytes(int bitCount, byte[] data = null, bool trimRight = false)
         {
-            Read(bitCount, out byte[] raw, (int)Math.Ceiling((double)bitCount / BSUtility.BITS));
-            return raw;
+            return Read(bitCount);
         }
 
         public byte[] SerializeBytes(byte[] data = null)
         {
-            Read(data.Length * BSUtility.BITS, out byte[] raw, data.Length);
-            return raw;
+            return Read(data.Length * BSUtility.BITS);
+        }
+
+        // Read internally
+        private byte[] Read(int bitCount)
+        {
+            if (bitCount == 0) return new byte[0];
+
+            if (bitCount < 0)
+                throw new ArgumentOutOfRangeException("Attempting to read a negative amount");
+
+            if (bitCount > TotalBits)
+                throw new ArgumentOutOfRangeException("Attempting to read further than stream");
+
+            // The total length of the bytes
+            int length = (bitCount - 1) / BSUtility.BITS + 1;
+            byte[] data = new byte[length];
+
+            // The offset to shift by
+            int offset = (BSUtility.BITS - bitCount % BSUtility.BITS) % BSUtility.BITS;
+            int leftShift = (bitPos - 1) % BSUtility.BITS;
+            int rightShift = BSUtility.BITS - leftShift;
+            byte leftValue = 0;
+
+            // Go through the stream
+            for (int i = 0; i < length; i++)
+            {
+                // Add the bits from the first part, shifted by bitPos
+                byte value = (byte)(internalStream[bytePos + i] << leftShift);
+
+                // Add the bits from the second part, shifted by 8 - bitPos
+                if (bytePos + i + 1 < internalStream.Length)
+                    value |= (byte)(internalStream[bytePos + i + 1] >> rightShift);
+
+                if (offset > 0)
+                {
+                    byte original = value;
+
+                    // Shift to the right to correct the data
+                    value = (byte)(value >> offset);
+
+                    // Shift part of the value on the left into this value
+                    if (bytePos + i - 1 >= 0)
+                        value |= (byte)(leftValue << BSUtility.BITS - offset);
+
+                    leftValue = original;
+                }
+
+                data[i] = value;
+            }
+
+            // Offset read count by bitCount
+            bytePos += bitCount / BSUtility.BITS;
+            bitPos += bitCount % BSUtility.BITS;
+            if (bitPos > BSUtility.BITS)
+            {
+                bitPos -= BSUtility.BITS;
+                bytePos++;
+            }
+
+            return data;
+
+
+            //int bitOffset = (bytePos * BSUtility.BYTE_BITS + bitPos - 1);
+            //int shift = (8 - bitCount % 8) % 8;
+            //byte[] data = BSUtility.Trim(internalStream, bitOffset, bitCount);
+            //byte[] newData = BSUtility.BitShiftRight(data, data.Length, shift);
+
+            //bytePos += bitCount / BSUtility.BYTE_BITS;
+            //bitPos += bitCount % 8;
+            //if (bitPos > BSUtility.BYTE_BITS)
+            //{
+            //    bitPos -= BSUtility.BYTE_BITS;
+            //    bytePos++;
+            //}
+
+            //return newData;
         }
 
 

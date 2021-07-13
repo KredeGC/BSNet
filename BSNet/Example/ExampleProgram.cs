@@ -55,89 +55,72 @@ namespace BSNet.Example
             //Console.ReadKey(true);
 
 
-            //// Test shift array
-            //// 11111111 00110011 11111111
-            //// 00011111 11100110 01111111
-            ////byte[] byteArray = new byte[] { 0b11111111, 0b00110011, 0b11111111 };
-            //byte[] byteArray = new byte[] { 0b11111111, 0b10000000 };
-            //byte[] shiftedArray = BSUtility.BitShiftRight(byteArray, byteArray.Length, 4);
-            //Console.WriteLine(shiftedArray[0]);
-            //Console.WriteLine(shiftedArray[1]);
-            ////Console.WriteLine(shiftedArray[2]);
-
-            //Console.ReadKey(true);
-
             // Testing nested writers
-            //byte[] testBytes = new byte[] { 0b11110000, 0b10101010, 0b11110000 };
-            //BSUtility.PrintBits(testBytes);
-            //byte[] trimmedBytes = BSUtility.Trim(testBytes, 4, 16);
-            //BSUtility.PrintBits(trimmedBytes);
+            //NewWriter occupy1 = NewWriter.GetWriter(4);
+            //NewWriter occupy2 = NewWriter.GetWriter(3);
+            //NewWriter occupy3 = NewWriter.GetWriter(2);
+            //NewWriter.ReturnWriter(occupy1);
+            //NewWriter.ReturnWriter(occupy2);
+            //NewWriter.ReturnWriter(occupy3);
 
-            NewWriter occupy1 = NewWriter.GetWriter(4);
-            NewWriter occupy2 = NewWriter.GetWriter(3);
-            NewWriter occupy3 = NewWriter.GetWriter(2);
-            NewWriter.ReturnWriter(occupy1);
-            NewWriter.ReturnWriter(occupy2);
-            NewWriter.ReturnWriter(occupy3);
-
-            byte[] fullBytes;
-            using (NewWriter writer1 = NewWriter.GetWriter(1))
-            {
-                writer1.SerializeUInt(1U, 1);
-                writer1.SerializeUInt(273U, 11);
-                writer1.SerializeUInt(273U, 17);
-                writer1.SerializeUInt(uint.MaxValue, 14);
-                writer1.SerializeUInt(511U, 9);
-                byte[] rawBytes = writer1.ToArray();
-                BSUtility.PrintBits(rawBytes);
-
-                using (NewWriter writer2 = NewWriter.GetWriter(2))
-                {
-                    writer2.SerializeBytes(writer1.TotalBits, rawBytes, true);
-                    BSUtility.PrintBits(writer2.ToArray());
-
-                    fullBytes = writer2.ToArray();
-                }
-            }
-
-            using (NewReader reader = NewReader.GetReader(fullBytes))
-            {
-                Console.WriteLine(reader.SerializeUInt(0, 1));
-                Console.WriteLine(reader.SerializeUInt(0, 11));
-                Console.WriteLine(reader.SerializeUInt(0, 17));
-                Console.WriteLine(reader.SerializeUInt(0, 14));
-                Console.WriteLine(reader.SerializeUInt(0, 9));
-            }
-
-            Console.ReadKey(true);
-            
-
-            // Testing a P2P implementation
-            //ExampleClient client1 = new ExampleClient(1609, "127.0.0.1", 1615);
-            //ExampleClient client2 = new ExampleClient(1615, "127.0.0.1", 1609);
-
-            //while (true)
+            //byte[] fullBytes;
+            //using (NewWriter writer1 = NewWriter.GetWriter(1))
             //{
-            //    client1.Update();
-            //    client2.Update();
+            //    writer1.SerializeUInt(1U, 1);
+            //    writer1.SerializeUInt(273U, 11);
+            //    writer1.SerializeUInt(273U, 17);
+            //    writer1.SerializeUInt(uint.MaxValue, 14);
+            //    writer1.SerializeUInt(511U, 9);
+            //    byte[] rawBytes = writer1.ToArray();
+            //    BSUtility.PrintBits(rawBytes);
 
-            //    if (Console.KeyAvailable)
+            //    using (NewWriter writer2 = NewWriter.GetWriter(2))
             //    {
-            //        ConsoleKey key = Console.ReadKey(true).Key;
-            //        if (key == ConsoleKey.Q)
-            //        {
-            //            break;
-            //        }
-            //        else if (key == ConsoleKey.D1)
-            //        {
-            //            client1.Dispose();
-            //            client1 = new ExampleClient(1609, "127.0.0.1", 1615);
-            //        }
+            //        writer2.SerializeBytes(writer1.TotalBits, rawBytes, true);
+            //        BSUtility.PrintBits(writer2.ToArray());
+
+            //        fullBytes = writer2.ToArray();
             //    }
             //}
 
-            //client1.Dispose();
-            //client2.Dispose();
+            //using (NewReader reader = NewReader.GetReader(fullBytes))
+            //{
+            //    Console.WriteLine(reader.SerializeUInt(0, 1));
+            //    Console.WriteLine(reader.SerializeUInt(0, 11));
+            //    Console.WriteLine(reader.SerializeUInt(0, 17));
+            //    Console.WriteLine(reader.SerializeUInt(0, 14));
+            //    Console.WriteLine(reader.SerializeUInt(0, 9));
+            //}
+
+            //Console.ReadKey(true);
+
+
+            //Testing a P2P implementation
+            ExampleClient client1 = new ExampleClient(1609, "127.0.0.1", 1615);
+            ExampleClient client2 = new ExampleClient(1615, "127.0.0.1", 1609);
+
+            while (true)
+            {
+                client1.Update();
+                client2.Update();
+
+                if (Console.KeyAvailable)
+                {
+                    ConsoleKey key = Console.ReadKey(true).Key;
+                    if (key == ConsoleKey.Q)
+                    {
+                        break;
+                    }
+                    else if (key == ConsoleKey.R)
+                    {
+                        client1.Dispose();
+                        client1 = new ExampleClient(1609, "127.0.0.1", 1615);
+                    }
+                }
+            }
+
+            client1.Dispose();
+            client2.Dispose();
         }
     }
 }
