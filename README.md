@@ -24,7 +24,7 @@ Should NOT be used with sensitive data as no encryption occurs, whatsoever.
 * Zombie clients.
 
 ### Future ideas
-* Some sort of packet fragmentation.
+* Some sort of packet fragmentation and reassembly.
 
 # Usage
 ## P2P example

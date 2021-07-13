@@ -278,7 +278,7 @@ namespace BSNet
         protected virtual byte[] SendRawMessage(ClientConnection connection, byte type, ulong token, Action<IBSStream> action = null)
         {
             // Increment sequence
-            connection.IncrementSequence(ElapsedTime);
+            connection.IncrementSequence(ElapsedTime, TickRate);
 
             byte[] rawBytes;
             using (BSWriter writer = BSWriter.Get(BSUtility.PACKET_MIN_SIZE))
@@ -420,7 +420,7 @@ namespace BSNet
                             if (connection.Authenticate(header.Token, ElapsedTime))
                             {
                                 // Remove acknowledged messages
-                                for (int i = 31; i >= 0; i--)
+                                for (int i = 31; i >= 0; i--) // Shouldn't it be 32?
                                 {
                                     ushort seq = (ushort)(header.Ack - i);
                                     if (BSUtility.IsAcknowledged(header.AckBits, header.Ack, seq))
@@ -432,7 +432,8 @@ namespace BSNet
                                             Packet.ReturnPacket(packet);
                                             unsentMessages.Remove(conSeq);
                                         }
-                                        OnMessageAcknowledged(seq);
+                                        if (!connection.HasReceivedAcknowledgement(seq, TickRate))
+                                            OnMessageAcknowledged(seq);
                                     }
                                 }
 
@@ -602,7 +603,6 @@ namespace BSNet
 
         /// <summary>
         /// Called when this socket receives an acknowledgement for a previously sent message, with the given sequence number
-        /// <para/>Note: This callback runs every time an acknowledgement is received, which can happen up to 33 times per message
         /// </summary>
         /// <param name="sequence">The sequence number that was acknowledged</param>
         protected virtual void OnMessageAcknowledged(ushort sequence) { }

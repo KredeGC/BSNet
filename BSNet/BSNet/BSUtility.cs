@@ -33,7 +33,7 @@ namespace BSNet
     {
         public const int TIMEOUT = 10; // Timeout for connections
         public const int BITS = 8; // Bits in a byte
-        public const int RTT_BUFFER_SIZE = 64; // Double the size of AckBits
+        public const int RTT_BUFFER_SIZE = 128; // Needs to be larger than AckBits
 
         public const int PACKET_MIN_SIZE =
             sizeof(uint) + // CRC32 of version + packet (4 bytes)

@@ -9,10 +9,14 @@ namespace BSNet.Example
     {
         protected Encoding encoding = new ASCIIEncoding();
 
+        protected bool verbose = false;
+
         public override byte[] ProtocolVersion => new byte[] { 0x00, 0x00, 0x00, 0x01 };
 
-        public ExampleClient(int localPort, string peerIP, int peerPort) : base(localPort)
+        public ExampleClient(int localPort, string peerIP, int peerPort, bool verbose = false) : base(localPort)
         {
+            this.verbose = verbose;
+
             // Construct peer endpoint
             IPAddress peerAddress = IPAddress.Parse(peerIP);
             IPEndPoint peerEndPoint = new IPEndPoint(peerAddress, peerPort);
@@ -22,7 +26,7 @@ namespace BSNet.Example
 
 #if NETWORK_DEBUG
             SimulatedPacketLatency = 250;
-            SimulatedPacketLoss = 250;
+            SimulatedPacketLoss = 500;
 #endif
         }
 
@@ -49,7 +53,8 @@ namespace BSNet.Example
         // Called when a connection has been established with this IPEndPoint
         protected override void OnConnect(IPEndPoint endPoint)
         {
-            Log($"{endPoint.ToString()} connected", LogLevel.Info);
+            if (verbose)
+                Log($"{endPoint.ToString()} connected", LogLevel.Info);
 
             // Create a packet
             ExamplePacket serializable = new ExamplePacket($"Hello network to {endPoint}!");
@@ -61,7 +66,8 @@ namespace BSNet.Example
         // Called when a connection has been lost with this IPEndPoint
         protected override void OnDisconnect(IPEndPoint endPoint)
         {
-            Log($"{endPoint.ToString()} disconnected", LogLevel.Info);
+            if (verbose)
+                Log($"{endPoint.ToString()} disconnected", LogLevel.Info);
         }
 
         // Called when we receive a message from this IPEndPoint
@@ -76,10 +82,22 @@ namespace BSNet.Example
             Log(emptySerializable.TestString, LogLevel.Info);
         }
 
-        /*protected override void OnNetworkStatistics(int outGoingBipS, int inComingBipS)
+        protected override void OnMessageAcknowledged(ushort sequence)
         {
-            Log($"Outgoing bits in the last second: {outGoingBipS / 1000f} Kbits/S");
-            Log($"Incoming bits in the last second: {inComingBipS / 1000f} Kbits/S");
-        }*/
+            //if (verbose)
+            //    Log($"Packet {sequence} acknowledged", LogLevel.Info);
+        }
+
+        protected override void OnNetworkStatistics(int outGoingBipS, int inComingBipS)
+        {
+            if (verbose)
+            {
+                foreach (ClientConnection connection in connections.Values)
+                    Log($"{Math.Round(connection.PacketLoss * 100)}% packet loss", LogLevel.Info);
+
+                Log($"Outgoing bits in the last second: {outGoingBipS / 1000f} Kbits/S", LogLevel.Info);
+                Log($"Incoming bits in the last second: {inComingBipS / 1000f} Kbits/S", LogLevel.Info);
+            }
+        }
     }
 }

@@ -1,5 +1,4 @@
-﻿using BSNet.Stream;
-using System;
+﻿using System;
 
 namespace BSNet.Example
 {
@@ -96,7 +95,7 @@ namespace BSNet.Example
 
 
             //Testing a P2P implementation
-            ExampleClient client1 = new ExampleClient(1609, "127.0.0.1", 1615);
+            ExampleClient client1 = new ExampleClient(1609, "127.0.0.1", 1615, true);
             ExampleClient client2 = new ExampleClient(1615, "127.0.0.1", 1609);
 
             while (true)
@@ -113,8 +112,8 @@ namespace BSNet.Example
                     }
                     else if (key == ConsoleKey.R)
                     {
-                        client1.Dispose();
-                        client1 = new ExampleClient(1609, "127.0.0.1", 1615);
+                        client2.Dispose();
+                        client2 = new ExampleClient(1615, "127.0.0.1", 1609);
                     }
                 }
             }
