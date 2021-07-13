@@ -83,6 +83,7 @@ public class Client : BSSocket
 ## Bitpacking
 The readers and writers have built-in functionality for packing bits as tight as you want.
 They can also quantize floats, halfs, Vectors and Quaternions, to keep the bits low.
+They can also encode strings using different TextEncodings, like ASCII or UTF-8.
 ```csharp
 // Create a new BoundedRange, with a minimum value of 0, a maximum of 1 and 0.01 in precision
 // This range will crunch a float into just 7 bits

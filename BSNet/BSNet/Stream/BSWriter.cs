@@ -127,45 +127,57 @@ namespace BSNet.Stream
         }
 
         // Padding
-        public byte[] PadToEnd()
+        public int PadToEnd()
         {
             int remaining = (BSUtility.PACKET_MAX_SIZE - 4) * BSUtility.BITS - TotalBits;
             byte[] padding = new byte[BSUtility.PACKET_MAX_SIZE];
             SerializeBytes(remaining, padding);
-            return padding;
+            return remaining;
+        }
+
+        public int PadToByte()
+        {
+            int remaining = (8 - TotalBits % 8) % 8;
+            byte[] padding = new byte[1];
+            SerializeBytes(remaining, padding);
+            return remaining;
         }
 
         // Unsigned
         public byte SerializeByte(byte value = default(byte), int bitCount = sizeof(byte) * BSUtility.BITS)
         {
-            byte[] bytes = new byte[] { value };
-            SerializeBytes(bitCount, bytes);
+            byte[] bytes = BSPool.GetBuffer(1);
+            bytes[0] = value;
+            Write(bitCount, bytes);
+            BSPool.ReturnBuffer(bytes);
             return value;
         }
 
         public ushort SerializeUShort(ushort value = default(ushort), int bitCount = sizeof(ushort) * BSUtility.BITS)
         {
-            byte[] bytes = new byte[2];
+            byte[] bytes = BSPool.GetBuffer(2);
             bytes[0] = (byte)(value >> 8);
             bytes[1] = (byte)value;
-            SerializeBytes(bitCount, bytes);
+            Write(bitCount, bytes);
+            BSPool.ReturnBuffer(bytes);
             return value;
         }
 
         public uint SerializeUInt(uint value = default(uint), int bitCount = sizeof(uint) * BSUtility.BITS)
         {
-            byte[] bytes = new byte[4];
+            byte[] bytes = BSPool.GetBuffer(4);
             bytes[0] = (byte)(value >> 24);
             bytes[1] = (byte)(value >> 16);
             bytes[2] = (byte)(value >> 8);
             bytes[3] = (byte)value;
-            SerializeBytes(bitCount, bytes);
+            Write(bitCount, bytes);
+            BSPool.ReturnBuffer(bytes);
             return value;
         }
 
         public ulong SerializeULong(ulong value = default(ulong), int bitCount = sizeof(ulong) * BSUtility.BITS)
         {
-            byte[] bytes = new byte[8];
+            byte[] bytes = BSPool.GetBuffer(8);
             bytes[0] = (byte)(value >> 56);
             bytes[1] = (byte)(value >> 48);
             bytes[2] = (byte)(value >> 40);
@@ -174,7 +186,8 @@ namespace BSNet.Stream
             bytes[5] = (byte)(value >> 16);
             bytes[6] = (byte)(value >> 8);
             bytes[7] = (byte)value;
-            SerializeBytes(bitCount, bytes);
+            Write(bitCount, bytes);
+            BSPool.ReturnBuffer(bytes);
             return value;
         }
 
@@ -337,7 +350,7 @@ namespace BSNet.Stream
             if (bitCount == 0) return;
 
             if (bitCount < 0)
-                throw new ArgumentOutOfRangeException("Attempting to write a negative amount");
+                throw new ArgumentOutOfRangeException("Attempting to write a negative bitCount");
 
             int expansion = bytePos + (bitPos - 1 + bitCount - 1) / BSUtility.BITS + 1;
 
@@ -397,105 +410,6 @@ namespace BSNet.Stream
             {
                 bitPos -= BSUtility.BITS;
                 bytePos++;
-            }
-
-            //int totalBits = bitCount + bitPos - 1 + offset;
-            //int byteCeil = (totalBits - 1) / BSUtility.BYTE_BITS + 1;
-            //byte[] shiftedData = BSUtility.Trim(data, 0, bitCount);
-
-            //internalStream[bytePos] |= shiftedData[0];
-
-            //for (int i = 1; i < shiftedData.Length; i++)
-            //    internalStream[bytePos + i] = shiftedData[i];
-
-            //bytePos += bitCount / BSUtility.BYTE_BITS;
-            //bitPos += bitCount % BSUtility.BYTE_BITS;
-            //if (bitPos > BSUtility.BYTE_BITS)
-            //{
-            //    bitPos -= BSUtility.BYTE_BITS;
-            //    bytePos++;
-            //}
-        }
-
-        private void WriteOld(int bitCount, byte[] data)
-        {
-            // Expand the stream
-            int expansion = bytePos + (bitPos - 1 + bitCount - 1) / BSUtility.BITS + 1;
-
-            if (expansion > internalStream.Length)
-            {
-                byte[] bytes = BSPool.GetBuffer(expansion);
-                Buffer.BlockCopy(internalStream, 0, bytes, 0, internalStream.Length);
-
-                BSPool.ReturnBuffer(internalStream);
-
-                internalStream = bytes;
-            }
-
-            // Write in little-endian
-            int byteCountCeil = (bitCount - 1) / BSUtility.BITS + 1;
-            int maxBytes = data.Length - byteCountCeil;
-            int consumedBits = 0;
-
-            // Optimization if the stream isn't offset by bits
-            if (bitPos == 1)
-            {
-                // Reverse array
-                if (data.Length > 1 && BitConverter.IsLittleEndian)
-                    Array.Reverse(data);
-
-                // Copy byte array into stream
-                Buffer.BlockCopy(data, 0, internalStream, bytePos, byteCountCeil);
-                bytePos += byteCountCeil;
-
-                // If bitcount isn't whole, set the last byte to the correct bits
-                int endBits = bitCount % BSUtility.BITS;
-                if (endBits != 0)
-                {
-                    bytePos--;
-                    internalStream[bytePos] = (byte)(data[bitCount / BSUtility.BITS] << (BSUtility.BITS - endBits));
-                    bitPos += endBits;
-                }
-
-                return;
-            }
-
-            // Pack the bits into the stream
-            for (int i = data.Length - 1; i >= maxBytes; i--)
-            {
-                int bitsToConsume = Math.Min(bitCount - consumedBits, BSUtility.BITS);
-                int remainingBits = BSUtility.BITS - (bitPos - 1);
-
-                byte value;
-                if (BitConverter.IsLittleEndian)
-                    value = (byte)(data[i] & BSUtility.GetNarrowingMask(bitsToConsume));
-                else
-                    value = (byte)(data[data.Length - 1 - i] & BSUtility.GetNarrowingMask(bitsToConsume));
-
-                if (bitsToConsume > remainingBits)
-                {
-                    // Add the first part of the value
-                    internalStream[bytePos++] |= (byte)((byte)(value >> (bitsToConsume - remainingBits)) & BSUtility.GetNarrowingMask(remainingBits));
-                    bitPos = 1;
-                    remainingBits = bitsToConsume - remainingBits;
-
-                    // Add the second part of the value, doesn't need the '|'
-                    internalStream[bytePos] |= (byte)(value << (BSUtility.BITS - remainingBits));
-                    bitPos += remainingBits;
-                }
-                else
-                {
-                    // Offset and add the value
-                    internalStream[bytePos] |= (byte)(value << (remainingBits - bitsToConsume));
-                    bitPos += bitsToConsume;
-                    if (bitPos > BSUtility.BITS)
-                    {
-                        bitPos = 1;
-                        bytePos++;
-                    }
-                }
-
-                consumedBits += bitsToConsume;
             }
         }
     }

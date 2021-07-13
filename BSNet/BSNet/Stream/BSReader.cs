@@ -144,11 +144,18 @@ namespace BSNet.Stream
         }
 
         // Padding
-        public byte[] PadToEnd()
+        public int PadToEnd()
         {
             int remaining = (BSUtility.PACKET_MAX_SIZE - 4) * BSUtility.BITS - TotalBits;
-            byte[] padding = SerializeBytes(remaining);
-            return padding;
+            SerializeBytes(remaining);
+            return remaining;
+        }
+
+        public int PadToByte()
+        {
+            int remaining = (8 - TotalBits % 8) % 8;
+            SerializeBytes(remaining);
+            return remaining;
         }
 
         // Unsigned
@@ -315,7 +322,7 @@ namespace BSNet.Stream
             if (bitCount == 0) return new byte[0];
 
             if (bitCount < 0)
-                throw new ArgumentOutOfRangeException("Attempting to read a negative amount");
+                throw new ArgumentOutOfRangeException("Attempting to read a negative bitCount");
 
             if (bitCount > TotalBits)
                 throw new ArgumentOutOfRangeException("Attempting to read further than stream");
@@ -367,100 +374,6 @@ namespace BSNet.Stream
             }
 
             return data;
-
-
-            //int bitOffset = (bytePos * BSUtility.BYTE_BITS + bitPos - 1);
-            //int shift = (8 - bitCount % 8) % 8;
-            //byte[] data = BSUtility.Trim(internalStream, bitOffset, bitCount);
-            //byte[] newData = BSUtility.BitShiftRight(data, data.Length, shift);
-
-            //bytePos += bitCount / BSUtility.BYTE_BITS;
-            //bitPos += bitCount % 8;
-            //if (bitPos > BSUtility.BYTE_BITS)
-            //{
-            //    bitPos -= BSUtility.BYTE_BITS;
-            //    bytePos++;
-            //}
-
-            //return newData;
-        }
-
-
-        private bool Read(int bitCount, out byte[] data, int typeBytes)
-        {
-            if (bitCount > TotalBits)
-            {
-                data = null;
-                return false;
-            }
-
-            data = new byte[typeBytes];
-
-            // Read in little-endian
-            int destBytePos = data.Length - 1;
-            int destBitPos = 1;
-            int consumedBits = 0;
-
-            while (consumedBits < bitCount)
-            {
-                int bitsToConsume = Math.Min(bitCount - consumedBits, BSUtility.BITS);
-                int remainingBits = BSUtility.BITS - (bitPos - 1);
-                int attemptConsumeBits = Math.Min(bitsToConsume, remainingBits);
-                byte rawValue = (byte)(internalStream[bytePos] & BSUtility.GetWideningMask(attemptConsumeBits, bitPos - 1));
-
-                bitPos += attemptConsumeBits;
-                if (bitPos > BSUtility.BITS)
-                {
-                    bitPos = 1;
-                    bytePos++;
-                }
-
-                if (bitsToConsume > attemptConsumeBits)
-                {
-                    data[destBytePos] |= (byte)(rawValue << (bitsToConsume - attemptConsumeBits));
-                    destBitPos += attemptConsumeBits;
-                    if (destBitPos > BSUtility.BITS)
-                    {
-                        destBitPos = 1;
-                        destBytePos--;
-                    }
-
-                    remainingBits = bitsToConsume - attemptConsumeBits;
-                    rawValue = (byte)(internalStream[bytePos] & BSUtility.GetWideningMask(remainingBits, bitPos - 1));
-                    data[destBytePos] |= (byte)(rawValue >> (BSUtility.BITS - remainingBits));
-
-                    destBitPos += remainingBits;
-                    if (destBitPos > BSUtility.BITS)
-                    {
-                        destBitPos = 1;
-                        destBytePos--;
-                    }
-
-                    bitPos += remainingBits;
-                    if (bitPos > BSUtility.BITS)
-                    {
-                        bitPos = 1;
-                        bytePos++;
-                    }
-                }
-                else
-                {
-                    data[destBytePos] |= (byte)(rawValue >> (remainingBits - bitsToConsume));
-                    destBitPos += bitsToConsume;
-                    if (destBitPos > BSUtility.BITS)
-                    {
-                        destBitPos = 1;
-                        destBytePos--;
-                    }
-                }
-
-                consumedBits += bitsToConsume;
-            }
-
-            if (!BitConverter.IsLittleEndian)
-                Array.Reverse(data);
-
-            return true;
         }
     }
 }

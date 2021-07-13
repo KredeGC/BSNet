@@ -17,7 +17,8 @@ namespace BSNet.Stream
         int TotalBits { get; }
 
         // Padding
-        byte[] PadToEnd();
+        int PadToEnd();
+        int PadToByte();
 
         // Unsigned
         byte SerializeByte(byte value = default(byte), int bitCount = sizeof(byte) * BSUtility.BITS);

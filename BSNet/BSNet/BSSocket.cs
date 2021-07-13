@@ -267,7 +267,7 @@ namespace BSNet
         }
 
         /// <summary>
-        /// Sends a raw message to the given endPoint
+        /// Sends a raw message to the given endPoint with a maximum size of 1024 bytes
         /// </summary>
         /// <exception cref="System.ArgumentOutOfRangeException"/>
         /// <param name="connection">The connection to send it to</param>

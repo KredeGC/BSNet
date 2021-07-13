@@ -1,10 +1,31 @@
-﻿using BSNet.Datagram;
+﻿/* 
+ * The MIT License(MIT)
+ * 
+ * Copyright(c) 2015-2017 Bui
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of
+ * this software and associated documentation files (the "Software"), to deal in
+ * the Software without restriction, including without limitation the rights to
+ * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+ * the Software, and to permit persons to whom the Software is furnished to do so,
+ * subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+ * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+ * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+ * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
+
+using BSNet.Datagram;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
-using System.Net.Sockets;
 
 namespace BSNet
 {
@@ -13,7 +34,7 @@ namespace BSNet
         public const int TIMEOUT = 10; // Timeout for connections
         public const int BITS = 8; // Bits in a byte
         public const int RTT_BUFFER_SIZE = 64; // Double the size of AckBits
-        
+
         public const int PACKET_MIN_SIZE =
             sizeof(uint) + // CRC32 of version + packet (4 bytes)
             Header.HEADER_SIZE; // Header
@@ -45,66 +66,6 @@ namespace BSNet
             bitMask <<= (BITS - bitCount);
             bitMask >>= startBit;
             return bitMask;
-        }
-
-        /// <summary>
-        /// Return this NAT's external IPAddress, sometimes
-        /// </summary>
-        /// <returns></returns>
-        public static IPAddress GetExternalIP()
-        {
-            IEnumerable<IPAddress> gateways = from networkInterface in NetworkInterface.GetAllNetworkInterfaces()
-                                              where
-                                                  networkInterface.OperationalStatus == OperationalStatus.Up ||
-                                                  networkInterface.OperationalStatus == OperationalStatus.Unknown
-                                              from address in networkInterface.GetIPProperties().GatewayAddresses
-                                              where address.Address.AddressFamily == AddressFamily.InterNetwork
-                                              select address.Address;
-
-
-            IEnumerable<IPAddress> unicastAddresses = from networkInterface in NetworkInterface.GetAllNetworkInterfaces()
-                                                      where
-                                                          networkInterface.OperationalStatus == OperationalStatus.Up ||
-                                                          networkInterface.OperationalStatus == OperationalStatus.Unknown
-                                                      from address in networkInterface.GetIPProperties().UnicastAddresses
-                                                      where address.Address.AddressFamily == AddressFamily.InterNetwork
-                                                      select address.Address;
-
-
-            foreach (IPAddress uniAddress in unicastAddresses)
-            {
-                try
-                {
-                    using (UdpClient client = new UdpClient(new IPEndPoint(uniAddress, 0)))
-                    {
-                        foreach (IPAddress gateway in gateways)
-                        {
-                            IPEndPoint gatewayEndPoint = new IPEndPoint(gateway, 5351); // PMP Port is 5351
-
-                            // Send a request
-                            try
-                            {
-                                byte[] buffer = new byte[] { 0, 0 };
-                                client.Send(buffer, buffer.Length, gatewayEndPoint);
-                            }
-                            catch (SocketException) { continue; }
-
-                            // Receive external IP
-                            IPEndPoint receivedFrom = new IPEndPoint(IPAddress.None, 0);
-                            byte[] response = client.Receive(ref receivedFrom);
-
-                            if (response.Length != 12 || response[0] != 0 || response[1] != 128) // 128 is server NOOP
-                                continue;
-
-                            byte[] addressBytes = new[] { response[8], response[9], response[10], response[11] };
-                            return new IPAddress(addressBytes);
-                        }
-                    }
-                }
-                catch (SocketException) { continue; }
-            }
-
-            return null;
         }
 
         /// <summary>
