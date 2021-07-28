@@ -1,12 +1,14 @@
-﻿using System;
+﻿using BSNet.Stream;
+using System;
 using System.Collections.Generic;
+using System.Text;
 using System.Threading;
 
 namespace BSNet.Example
 {
     public class ExampleProgram
     {
-        public static void Main(string[] args)
+        public static void Main(string[] _)
         {
             // Testing on a header
             //using (BSWriter writer = BSWriter.GetWriter(21))
@@ -57,25 +59,30 @@ namespace BSNet.Example
 
 
             // Testing nested writers
-            //NewWriter occupy1 = NewWriter.GetWriter(4);
-            //NewWriter occupy2 = NewWriter.GetWriter(3);
-            //NewWriter occupy3 = NewWriter.GetWriter(2);
-            //NewWriter.ReturnWriter(occupy1);
-            //NewWriter.ReturnWriter(occupy2);
-            //NewWriter.ReturnWriter(occupy3);
+            //BSWriter occupy1 = BSWriter.Get(4);
+            //BSWriter occupy2 = BSWriter.Get(3);
+            //BSWriter occupy3 = BSWriter.Get(2);
+            //BSWriter.Return(occupy1);
+            //BSWriter.Return(occupy2);
+            //BSWriter.Return(occupy3);
 
             //byte[] fullBytes;
-            //using (NewWriter writer1 = NewWriter.GetWriter(1))
+            //using (BSWriter writer1 = BSWriter.Get(1))
             //{
             //    writer1.SerializeUInt(1U, 1);
             //    writer1.SerializeUInt(273U, 11);
             //    writer1.SerializeUInt(273U, 17);
             //    writer1.SerializeUInt(uint.MaxValue, 14);
             //    writer1.SerializeUInt(511U, 9);
+            //    writer1.SerializeUInt(511U, 9);
+            //    writer1.SerializeUInt(511U, 9);
+            //    writer1.SerializeUInt(511U, 9);
+            //    writer1.SerializeUInt(511U, 9);
+            //    writer1.SerializeUInt(511U, 9);
             //    byte[] rawBytes = writer1.ToArray();
             //    BSUtility.PrintBits(rawBytes);
 
-            //    using (NewWriter writer2 = NewWriter.GetWriter(2))
+            //    using (BSWriter writer2 = BSWriter.Get(2))
             //    {
             //        writer2.SerializeBytes(writer1.TotalBits, rawBytes, true);
             //        BSUtility.PrintBits(writer2.ToArray());
@@ -84,33 +91,76 @@ namespace BSNet.Example
             //    }
             //}
 
-            //using (NewReader reader = NewReader.GetReader(fullBytes))
+            //using (BSReader reader = BSReader.Get(fullBytes))
             //{
             //    Console.WriteLine(reader.SerializeUInt(0, 1));
             //    Console.WriteLine(reader.SerializeUInt(0, 11));
             //    Console.WriteLine(reader.SerializeUInt(0, 17));
             //    Console.WriteLine(reader.SerializeUInt(0, 14));
             //    Console.WriteLine(reader.SerializeUInt(0, 9));
+            //    Console.WriteLine(reader.SerializeUInt(0, 9));
+            //    Console.WriteLine(reader.SerializeUInt(0, 9));
+            //    Console.WriteLine(reader.SerializeUInt(0, 9));
+            //    Console.WriteLine(reader.SerializeUInt(0, 9));
+            //    Console.WriteLine(reader.SerializeUInt(0, 9));
             //}
 
             //Console.ReadKey(true);
 
 
-            // Example server
+            MainServer();
+        }
+
+        private static void MainP2P()
+        {
+            // Testing a P2P implementation
+            ExampleClient client1 = new ExampleClient(1609, "127.0.0.1", 1615, true);
+            ExampleClient client2 = new ExampleClient(1615, "127.0.0.1", 1609);
+
+            while (true)
+            {
+                client1.Update();
+                client2.Update();
+
+                if (Console.KeyAvailable)
+                {
+                    ConsoleKey key = Console.ReadKey(true).Key;
+                    if (key == ConsoleKey.Q)
+                    {
+                        break;
+                    }
+                    else if (key == ConsoleKey.R)
+                    {
+                        client2.Dispose();
+                        client2 = new ExampleClient(1615, "127.0.0.1", 1609);
+                    }
+                }
+            }
+
+            client1.Dispose();
+            client2.Dispose();
+        }
+
+        private static ExampleServer Server { get; set; }
+
+        private static void MainServer()
+        {
             int serverPort = 1615;
-            ExampleServer server = new ExampleServer(serverPort);
+            Server = new ExampleServer(serverPort);
             List<ExampleClient> botClients = new List<ExampleClient>();
 
             bool quit = false;
 
-            Action stopServer = new Action(() =>
+            // Lambda for stopping the server
+            Action StopServer = new Action(() =>
             {
-                server.Dispose();
+                Server.Dispose();
 
                 lock (botClients)
                 {
                     foreach (ExampleClient client in botClients)
                         client.Dispose();
+                    botClients.Clear();
                 }
             });
 
@@ -119,7 +169,7 @@ namespace BSNet.Example
             {
                 while (!quit)
                 {
-                    server.Update();
+                    Server.Update();
 
                     lock (botClients)
                     {
@@ -131,13 +181,14 @@ namespace BSNet.Example
             thread.Start();
 
             // Catch interrupts
-            Console.CancelKeyPress += (sender, e) => {
+            Console.CancelKeyPress += (sender, e) =>
+            {
                 e.Cancel = true;
 
                 quit = true;
 
                 // Dispose of server
-                stopServer.Invoke();
+                StopServer();
 
                 Environment.Exit(0);
             };
@@ -147,68 +198,121 @@ namespace BSNet.Example
             {
                 Console.Write("> ");
                 string msg = Console.ReadLine().ToLower();
-                string[] pars = msg.Split(' ');
-                string command = pars[0];
+                string[] args = msg.Split(' ');
+                string command = args[0];
                 switch (command)
                 {
                     case "cls":
                         Console.Clear();
                         break;
                     case "pl":
-                        server.PrintConnections();
+                        Server.PrintConnections(20);
                         break;
                     case "bot":
-                        lock (botClients)
+                        AddBot(args, botClients);
+                        break;
+                    case "version":
+                        VersionCommands(args);
+                        break;
+                    case "hide":
+                        string logLevel = args[1];
+                        switch (logLevel)
                         {
-                            ExampleClient client = new ExampleClient(0, "127.0.0.1", serverPort);
-                            botClients.Add(client);
+                            case "info":
+
+                                break;
+                            case "warning":
+
+                                break;
+                            case "error":
+
+                                break;
                         }
                         break;
-                    case "":
+                    case "show":
 
                         break;
                     case "exit":
                         quit = true;
                         break;
                     case "restart":
-                        stopServer.Invoke();
-                        lock (botClients)
-                            botClients.Clear();
-                        server = new ExampleServer(serverPort);
+                        Restart(StopServer, botClients);
+                        break;
+                    default:
+                        Console.WriteLine($"Unknown command: {command}");
                         break;
                 }
             }
 
             // Dispose of server
-            stopServer.Invoke();
+            StopServer();
+        }
 
+        private static void PrintBytes(byte[] bytes)
+        {
+            string alphabet = "0123456789ABCDEF";
 
-            // Testing a P2P implementation
-            //ExampleClient client1 = new ExampleClient(1609, "127.0.0.1", 1615, true);
-            //ExampleClient client2 = new ExampleClient(1615, "127.0.0.1", 1609);
+            for (int i = 0; i < bytes.Length; i++)
+            {
+                byte value = bytes[i];
+                char first = alphabet[(int)(value >> 4)];
+                char second = alphabet[(int)(value & 0xF)];
 
-            //while (true)
-            //{
-            //    client1.Update();
-            //    client2.Update();
+                Console.Write($"0x{first}{second}");
 
-            //    if (Console.KeyAvailable)
-            //    {
-            //        ConsoleKey key = Console.ReadKey(true).Key;
-            //        if (key == ConsoleKey.Q)
-            //        {
-            //            break;
-            //        }
-            //        else if (key == ConsoleKey.R)
-            //        {
-            //            client2.Dispose();
-            //            client2 = new ExampleClient(1615, "127.0.0.1", 1609);
-            //        }
-            //    }
-            //}
+                if (i < bytes.Length - 1)
+                    Console.Write(", ");
+            }
 
-            //client1.Dispose();
-            //client2.Dispose();
+            Console.Write("\r\n");
+        }
+
+        private static void AddBot(string[] args, IList<ExampleClient> botClients)
+        {
+            int amount = 1;
+            if (args.Length > 1)
+                int.TryParse(args[1], out amount);
+
+            lock (botClients)
+            {
+                for (int i = 0; i < amount; i++)
+                {
+                    ExampleClient client = new ExampleClient(0, "127.0.0.1", Server.Port);
+                    botClients.Add(client);
+                }
+            }
+        }
+
+        private static void VersionCommands(string[] args)
+        {
+            if (args.Length < 2) return;
+
+            switch (args[1])
+            {
+                case "get":
+                    PrintBytes(Server.ProtocolVersion);
+                    break;
+                case "generate":
+                    int length = 8;
+                    if (args.Length > 2)
+                        int.TryParse(args[2], out length);
+
+                    byte[] protocolVersion = new byte[length];
+                    Cryptography.GetBytes(protocolVersion);
+
+                    PrintBytes(protocolVersion);
+                    break;
+                default:
+                    Console.WriteLine($"Unknown command: {args[0]} {args[1]}");
+                    break;
+            }
+        }
+
+        private static void Restart(Action StopServer, IList<ExampleClient> botClients)
+        {
+            int serverPort = Server.Port;
+            StopServer();
+            Server = new ExampleServer(serverPort);
         }
     }
 }

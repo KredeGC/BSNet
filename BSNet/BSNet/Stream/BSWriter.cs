@@ -73,7 +73,6 @@ namespace BSNet.Stream
                 if (writerPool.Count > 0)
                 {
                     writer = writerPool.Dequeue();
-                    BSPool.ReturnBuffer(writer.internalStream);
                     writer.internalStream = BSPool.GetBuffer(length);
                 }
                 else
@@ -93,9 +92,13 @@ namespace BSNet.Stream
         {
             lock (writerPool)
             {
-                writer.bytePos = 0;
-                writer.bitPos = 1;
-                writerPool.Enqueue(writer);
+                BSPool.ReturnBuffer(writer.internalStream);
+                if (writerPool.Count < 4)
+                {
+                    writer.bytePos = 0;
+                    writer.bitPos = 1;
+                    writerPool.Enqueue(writer);
+                }
             }
         }
 

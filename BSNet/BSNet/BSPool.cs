@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 
 namespace BSNet
 {
@@ -40,6 +41,9 @@ namespace BSNet
                 Array.Clear(buffer, 0, buffer.Length);
                 bufferPool[buffer.Length].Enqueue(buffer);
             }
+
+            //foreach (KeyValuePair<int, Queue<byte[]>> pair in bufferPool)
+            //    Debug.WriteLine($"Pool {pair.Key} - {pair.Value.Count} returned");
         }
     }
 }

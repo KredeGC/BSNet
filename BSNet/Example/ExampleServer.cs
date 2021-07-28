@@ -31,11 +31,17 @@ namespace BSNet.Example
         }
 
         // Print current connections and their stats
-        public void PrintConnections()
+        public void PrintConnections(int amount)
         {
             Log($"{connections.Count} players connected", LogLevel.Info);
+            int counter = 0;
             foreach (ClientConnection connection in connections.Values)
+            {
                 Log($"{connection.AddressPoint} - {Math.Round(connection.RTT * 1000)}ms latency - {Math.Round(connection.PacketLoss * 100)}% packet loss", LogLevel.Info);
+                counter++;
+                if (counter > amount)
+                    break;
+            }
         }
 
         // For error logging

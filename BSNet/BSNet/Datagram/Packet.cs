@@ -75,7 +75,10 @@ namespace BSNet.Datagram
         {
             lock (packetPool)
             {
-                packetPool.Enqueue(packet);
+                if (packetPool.Count < 4)
+                {
+                    packetPool.Enqueue(packet);
+                }
             }
         }
     }

@@ -28,6 +28,7 @@ namespace BSNet
         // Properties
         public virtual double TickRate { protected set; get; }
         public abstract byte[] ProtocolVersion { get; }
+        public virtual int Port { get { return ((IPEndPoint)socket.LocalEndPoint).Port; } }
 
 #if NETWORK_DEBUG
         // Network debugging
@@ -318,6 +319,7 @@ namespace BSNet
                     Log(e.ToString(), LogLevel.Error);
                 }
             }
+            catch (Exception) { }
 
             outGoingBipS += rawBytes.Length * 8;
 
@@ -478,7 +480,7 @@ namespace BSNet
                 EndPoint endPoint = new IPEndPoint(IPAddress.Any, 0);
 
                 // Get packets from other endpoints
-                byte[] rawBytes = BSPool.GetBuffer(BSUtility.PACKET_MAX_SIZE);
+                byte[] rawBytes = new byte[BSUtility.PACKET_MAX_SIZE];
                 int length = socket.ReceiveFrom(rawBytes, ref endPoint);
 
 #if NETWORK_DEBUG
@@ -492,7 +494,7 @@ namespace BSNet
                     int shiftAmount = random.Next(length * BSUtility.BITS);
                     byte bitMask = (byte)(1 << (shiftAmount % 8));
                     int byteToFlip = length - (shiftAmount - 1) / BSUtility.BITS + 1;
-                    
+
                     rawBytes[byteToFlip] ^= bitMask;
                 }
 
@@ -600,7 +602,7 @@ namespace BSNet
                 inComingBipS = 0;
             }
         }
-        
+
 
         protected virtual void OnNetworkStatistics(int outGoingBipS, int inComingBipS)
         {

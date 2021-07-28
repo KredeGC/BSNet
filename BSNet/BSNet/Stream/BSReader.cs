@@ -77,7 +77,6 @@ namespace BSNet.Stream
                 if (readerPool.Count > 0)
                 {
                     reader = readerPool.Dequeue();
-                    BSPool.ReturnBuffer(reader.internalStream);
                     reader.internalStream = BSPool.GetBuffer(length);
                     Buffer.BlockCopy(byteStream, 0, reader.internalStream, 0, length);
                 }
@@ -98,9 +97,13 @@ namespace BSNet.Stream
         {
             lock (readerPool)
             {
-                reader.bytePos = 0;
-                reader.bitPos = 1;
-                readerPool.Enqueue(reader);
+                BSPool.ReturnBuffer(reader.internalStream);
+                if (readerPool.Count < 4)
+                {
+                    reader.bytePos = 0;
+                    reader.bitPos = 1;
+                    readerPool.Enqueue(reader);
+                }
             }
         }
 
