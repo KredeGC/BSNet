@@ -5,24 +5,15 @@ using System.Text;
 
 namespace BSNet.Example
 {
-    public class ExampleClient : BSSocket
+    public class ExampleServer : BSSocket
     {
         protected Encoding encoding = new ASCIIEncoding();
 
-        protected bool verbose = false;
-
         public override byte[] ProtocolVersion => new byte[] { 0x00, 0x00, 0x00, 0x01 };
 
-        public ExampleClient(int localPort, string peerIP, int peerPort, bool verbose = false) : base(localPort)
+        public ExampleServer(int localPort) : base(localPort)
         {
-            this.verbose = verbose;
-
-            // Construct peer endpoint
-            IPAddress peerAddress = IPAddress.Parse(peerIP);
-            IPEndPoint peerEndPoint = new IPEndPoint(peerAddress, peerPort);
-
-            // Send a request to connect
-            Connect(peerEndPoint);
+            Log("Server starting", LogLevel.Info);
 
 #if NETWORK_DEBUG
             SimulatedPacketLatency = 250; // 250ms
@@ -31,13 +22,29 @@ namespace BSNet.Example
 #endif
         }
 
+        protected override void Dispose(bool disposing)
+        {
+            base.Dispose(disposing);
+
+            if (disposing)
+                Log("Server stopping", LogLevel.Info);
+        }
+
+        // Print current connections and their stats
+        public void PrintConnections()
+        {
+            Log($"{connections.Count} players connected", LogLevel.Info);
+            foreach (ClientConnection connection in connections.Values)
+                Log($"{connection.AddressPoint} - {Math.Round(connection.RTT * 1000)}ms latency - {Math.Round(connection.PacketLoss * 100)}% packet loss", LogLevel.Info);
+        }
+
         // For error logging
         protected override void Log(object obj, LogLevel level)
         {
             Console.ForegroundColor = ConsoleColor.Gray;
             Console.Write($"[{DateTime.Now.TimeOfDay}]");
-            Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.Write($"[Bot] ");
+            Console.ForegroundColor = ConsoleColor.DarkGreen;
+            Console.Write($"[Server] ");
             switch (level)
             {
                 case LogLevel.Info:
@@ -56,21 +63,13 @@ namespace BSNet.Example
         // Called when a connection has been established with this IPEndPoint
         protected override void OnConnect(IPEndPoint endPoint)
         {
-            if (verbose)
-                Log($"{endPoint.ToString()} connected", LogLevel.Info);
-
-            // Create a packet
-            ExamplePacket serializable = new ExamplePacket($"Hello network to {endPoint}!");
-
-            // Serialize the message and send it to the connected IPEndPoint
-            SendMessageReliable(endPoint, serializable);
+            Log($"{endPoint.ToString()} connected", LogLevel.Info);
         }
 
         // Called when a connection has been lost with this IPEndPoint
         protected override void OnDisconnect(IPEndPoint endPoint)
         {
-            if (verbose)
-                Log($"{endPoint.ToString()} disconnected", LogLevel.Info);
+            Log($"{endPoint.ToString()} disconnected", LogLevel.Info);
         }
 
         // Called when we receive a message from this IPEndPoint
@@ -82,8 +81,7 @@ namespace BSNet.Example
             // Deserialize the message
             emptySerializable.Serialize(reader);
 
-            if (verbose)
-                Log(emptySerializable.TestString, LogLevel.Info);
+            Log(emptySerializable.TestString, LogLevel.Info);
         }
 
         protected override void OnMessageAcknowledged(ushort sequence)
@@ -94,7 +92,7 @@ namespace BSNet.Example
 
         protected override void OnNetworkStatistics(int outGoingBipS, int inComingBipS)
         {
-            if (verbose)
+            if (false)
             {
                 foreach (ClientConnection connection in connections.Values)
                     Log($"{connection.AddressPoint} - {Math.Round(connection.RTT * 1000)}ms latency - {Math.Round(connection.PacketLoss * 100)}% packet loss", LogLevel.Info);

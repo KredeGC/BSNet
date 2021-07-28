@@ -33,6 +33,7 @@ namespace BSNet
         // Network debugging
         public virtual int SimulatedPacketLoss { set; get; } // 0-1000
         public virtual int SimulatedPacketLatency { set; get; } // 0-1000
+        public virtual int SimulatedPacketCorruption { set; get; } // 0-1000
 
         protected System.Random random = new System.Random();
 
@@ -127,7 +128,7 @@ namespace BSNet
         }
 
         /// <summary>
-        /// Handles incoming messages at the given tickrate
+        /// Call this in a loop to handle incoming and outgoing packet
         /// </summary>
         public virtual void Update()
         {
@@ -359,7 +360,7 @@ namespace BSNet
             {
                 if (!reader.SerializeChecksum(ProtocolVersion))
                 {
-                    Log($"Mismatching CRC checksum for {endPoint}", LogLevel.Warning);
+                    Log($"Mismatching checksum received from {endPoint}", LogLevel.Warning);
                     return;
                 }
 
@@ -446,7 +447,7 @@ namespace BSNet
                             }
                             else
                             {
-                                Log($"Mismatching token for {endPoint}", LogLevel.Warning);
+                                Log($"Mismatching token received from {endPoint}", LogLevel.Warning);
                             }
                         }
                     }
@@ -472,7 +473,7 @@ namespace BSNet
             }
 #endif
 
-            while (socket.Available > 0)
+            while (!_disposing && socket.Available > 0)
             {
                 EndPoint endPoint = new IPEndPoint(IPAddress.Any, 0);
 
@@ -484,6 +485,16 @@ namespace BSNet
                 // Simulate packet loss
                 if (SimulatedPacketLoss > 0 && random.Next(1000) < SimulatedPacketLoss)
                     continue;
+
+                // Simulate packet corruption
+                if (SimulatedPacketCorruption > 0 && random.Next(1000) < SimulatedPacketCorruption)
+                {
+                    int shiftAmount = random.Next(length * BSUtility.BITS);
+                    byte bitMask = (byte)(1 << (shiftAmount % 8));
+                    int byteToFlip = length - (shiftAmount - 1) / BSUtility.BITS + 1;
+                    
+                    rawBytes[byteToFlip] ^= bitMask;
+                }
 
                 // Simulate packet latency
                 if (SimulatedPacketLatency > 0)
@@ -589,9 +600,7 @@ namespace BSNet
                 inComingBipS = 0;
             }
         }
-
-
-        protected abstract void Log(object obj, LogLevel level);
+        
 
         protected virtual void OnNetworkStatistics(int outGoingBipS, int inComingBipS)
         {
@@ -601,11 +610,13 @@ namespace BSNet
             Log($"Incoming bits in the last second: {inComingBipS / 1000f} Kbits/S", LogLevel.Info);*/
         }
 
+        protected abstract void Log(object obj, LogLevel level);
+
         /// <summary>
         /// Called when this socket receives an acknowledgement for a previously sent message, with the given sequence number
         /// </summary>
         /// <param name="sequence">The sequence number that was acknowledged</param>
-        protected virtual void OnMessageAcknowledged(ushort sequence) { }
+        protected abstract void OnMessageAcknowledged(ushort sequence);
 
         /// <summary>
         /// Called when a connection is established with a remote endPoint

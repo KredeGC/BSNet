@@ -25,6 +25,10 @@ Should NOT be used with sensitive data as no encryption occurs, whatsoever.
 
 ### Future ideas
 * Some sort of packet fragmentation and reassembly.
+* Make SendMessageUnreliable and SendMessageReliable buffer instead of sending straight away.
+  * On each tick: Combine the buffered messages into one, preferring the reliable buffer.
+  * In regards to the reliable buffer: Don't remove packets from the buffer until it has been acknowledged.
+  * Possibly use the aforementioned fragmentation, if the packets are too big.
 
 # Usage
 ## P2P example

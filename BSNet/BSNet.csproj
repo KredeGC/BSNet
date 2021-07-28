@@ -66,6 +66,7 @@
     <Compile Include="BSNet\Stream\IBSStream.cs" />
     <Compile Include="Example\ExampleClient.cs" />
     <Compile Include="Example\ExamplePacket.cs" />
+    <Compile Include="Example\ExampleServer.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Example\ExampleProgram.cs" />
   </ItemGroup>

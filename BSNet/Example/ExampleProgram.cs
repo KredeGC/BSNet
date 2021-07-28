@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Threading;
 
 namespace BSNet.Example
 {
@@ -94,32 +96,119 @@ namespace BSNet.Example
             //Console.ReadKey(true);
 
 
-            //Testing a P2P implementation
-            ExampleClient client1 = new ExampleClient(1609, "127.0.0.1", 1615, true);
-            ExampleClient client2 = new ExampleClient(1615, "127.0.0.1", 1609);
+            // Example server
+            int serverPort = 1615;
+            ExampleServer server = new ExampleServer(serverPort);
+            List<ExampleClient> botClients = new List<ExampleClient>();
 
-            while (true)
+            bool quit = false;
+
+            Action stopServer = new Action(() =>
             {
-                client1.Update();
-                client2.Update();
+                server.Dispose();
 
-                if (Console.KeyAvailable)
+                lock (botClients)
                 {
-                    ConsoleKey key = Console.ReadKey(true).Key;
-                    if (key == ConsoleKey.Q)
+                    foreach (ExampleClient client in botClients)
+                        client.Dispose();
+                }
+            });
+
+            // Run the server + bots in another thread
+            Thread thread = new Thread(() =>
+            {
+                while (!quit)
+                {
+                    server.Update();
+
+                    lock (botClients)
                     {
+                        foreach (ExampleClient client in botClients)
+                            client.Update();
+                    }
+                }
+            });
+            thread.Start();
+
+            // Catch interrupts
+            Console.CancelKeyPress += (sender, e) => {
+                e.Cancel = true;
+
+                quit = true;
+
+                // Dispose of server
+                stopServer.Invoke();
+
+                Environment.Exit(0);
+            };
+
+            // Run commands
+            while (!quit)
+            {
+                Console.Write("> ");
+                string msg = Console.ReadLine().ToLower();
+                string[] pars = msg.Split(' ');
+                string command = pars[0];
+                switch (command)
+                {
+                    case "cls":
+                        Console.Clear();
                         break;
-                    }
-                    else if (key == ConsoleKey.R)
-                    {
-                        client2.Dispose();
-                        client2 = new ExampleClient(1615, "127.0.0.1", 1609);
-                    }
+                    case "pl":
+                        server.PrintConnections();
+                        break;
+                    case "bot":
+                        lock (botClients)
+                        {
+                            ExampleClient client = new ExampleClient(0, "127.0.0.1", serverPort);
+                            botClients.Add(client);
+                        }
+                        break;
+                    case "":
+
+                        break;
+                    case "exit":
+                        quit = true;
+                        break;
+                    case "restart":
+                        stopServer.Invoke();
+                        lock (botClients)
+                            botClients.Clear();
+                        server = new ExampleServer(serverPort);
+                        break;
                 }
             }
 
-            client1.Dispose();
-            client2.Dispose();
+            // Dispose of server
+            stopServer.Invoke();
+
+
+            // Testing a P2P implementation
+            //ExampleClient client1 = new ExampleClient(1609, "127.0.0.1", 1615, true);
+            //ExampleClient client2 = new ExampleClient(1615, "127.0.0.1", 1609);
+
+            //while (true)
+            //{
+            //    client1.Update();
+            //    client2.Update();
+
+            //    if (Console.KeyAvailable)
+            //    {
+            //        ConsoleKey key = Console.ReadKey(true).Key;
+            //        if (key == ConsoleKey.Q)
+            //        {
+            //            break;
+            //        }
+            //        else if (key == ConsoleKey.R)
+            //        {
+            //            client2.Dispose();
+            //            client2 = new ExampleClient(1615, "127.0.0.1", 1609);
+            //        }
+            //    }
+            //}
+
+            //client1.Dispose();
+            //client2.Dispose();
         }
     }
 }

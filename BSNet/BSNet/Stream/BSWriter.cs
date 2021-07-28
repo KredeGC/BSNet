@@ -363,6 +363,9 @@ namespace BSNet.Stream
 
                 internalStream = bytes;
             }
+            
+            if (!BitConverter.IsLittleEndian)
+	            Array.Reverse(data);
 
             // Length of the data
             int byteCountCeil = (bitCount - 1 + bitPos - 1) / BSUtility.BITS + 1;
