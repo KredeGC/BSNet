@@ -93,7 +93,7 @@ namespace BSNet.Stream
             lock (writerPool)
             {
                 BSPool.ReturnBuffer(writer.internalStream);
-                if (writerPool.Count < 4)
+                if (writerPool.Count < BSUtility.MAX_POOLING)
                 {
                     writer.bytePos = 0;
                     writer.bitPos = 1;

@@ -7,9 +7,12 @@ namespace BSNet.Example
 {
     public class ExampleServer : BSSocket
     {
-        protected Encoding encoding = new ASCIIEncoding();
-
         public override byte[] ProtocolVersion => new byte[] { 0x00, 0x00, 0x00, 0x01 };
+
+        public int OutgoingBipS { get; private set; }
+        public int IncomingBipS { get; private set; }
+
+        protected Encoding encoding = new ASCIIEncoding();
 
         public ExampleServer(int localPort) : base(localPort)
         {
@@ -30,18 +33,28 @@ namespace BSNet.Example
                 Log("Server stopping", LogLevel.Info);
         }
 
+        // Print outgoing + incoming bits per second
+        public void PrintNetworkStats()
+        {
+            Log($"Outgoing bits in the last second: {OutgoingBipS / 1000f} Kbits", LogLevel.Info);
+            Log($"Incoming bits in the last second: {IncomingBipS / 1000f} Kbits", LogLevel.Info);
+        }
+
         // Print current connections and their stats
         public void PrintConnections(int amount)
         {
-            Log($"{connections.Count} players connected", LogLevel.Info);
             int counter = 0;
             foreach (ClientConnection connection in connections.Values)
             {
-                Log($"{connection.AddressPoint} - {Math.Round(connection.RTT * 1000)}ms latency - {Math.Round(connection.PacketLoss * 100)}% packet loss", LogLevel.Info);
-                counter++;
-                if (counter > amount)
-                    break;
+                if (connection.Authenticated)
+                {
+                    Log($"{connection.AddressPoint} - {Math.Round(connection.RTT * 1000)}ms latency - {Math.Round(connection.PacketLoss * 100)}% packet loss", LogLevel.Info);
+                    counter++;
+                    if (counter > amount)
+                        break;
+                }
             }
+            Log($"{connections.Count} players connected", LogLevel.Info);
         }
 
         // For error logging
@@ -98,14 +111,8 @@ namespace BSNet.Example
 
         protected override void OnNetworkStatistics(int outGoingBipS, int inComingBipS)
         {
-            if (false)
-            {
-                foreach (ClientConnection connection in connections.Values)
-                    Log($"{connection.AddressPoint} - {Math.Round(connection.RTT * 1000)}ms latency - {Math.Round(connection.PacketLoss * 100)}% packet loss", LogLevel.Info);
-
-                Log($"Outgoing bits in the last second: {outGoingBipS / 1000f} Kbits/S", LogLevel.Info);
-                Log($"Incoming bits in the last second: {inComingBipS / 1000f} Kbits/S", LogLevel.Info);
-            }
+            OutgoingBipS = outGoingBipS;
+            IncomingBipS = inComingBipS;
         }
     }
 }

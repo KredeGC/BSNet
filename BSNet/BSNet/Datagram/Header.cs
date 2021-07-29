@@ -101,7 +101,8 @@ namespace BSNet.Datagram
         {
             lock (headerPool)
             {
-                headerPool.Enqueue(header);
+                if (headerPool.Count < BSUtility.MAX_POOLING)
+                    headerPool.Enqueue(header);
             }
         }
 

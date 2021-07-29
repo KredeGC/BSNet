@@ -98,7 +98,7 @@ namespace BSNet.Stream
             lock (readerPool)
             {
                 BSPool.ReturnBuffer(reader.internalStream);
-                if (readerPool.Count < 4)
+                if (readerPool.Count < BSUtility.MAX_POOLING)
                 {
                     reader.bytePos = 0;
                     reader.bitPos = 1;

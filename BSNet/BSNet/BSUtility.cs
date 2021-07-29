@@ -26,6 +26,7 @@ using System;
 using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
+using System.Text;
 
 namespace BSNet
 {
@@ -34,11 +35,12 @@ namespace BSNet
         public const int TIMEOUT = 10; // Timeout for connections
         public const int BITS = 8; // Bits in a byte
         public const int RTT_BUFFER_SIZE = 128; // Needs to be larger than AckBits
+        public const int MAX_POOLING = 4;
 
         public const int PACKET_MIN_SIZE =
             sizeof(uint) + // CRC32 of version + packet (4 bytes)
             Header.HEADER_SIZE; // Header
-        public const int PACKET_MAX_SIZE = 1024;
+        public const int PACKET_MAX_SIZE = 1024; // 1472
 
         private static readonly byte[] sBitMasks;
 
@@ -103,16 +105,16 @@ namespace BSNet
             for (int i = 0; i < 8; i++)
                 fields[i] = 1 << (7 - i);
 
-            string str = string.Empty;
+            StringBuilder builder = new StringBuilder();
             for (int i = 0; i < data.Length; i++)
             {
                 for (int j = 0; j < fields.Length; j++)
-                    str += (data[i] & fields[j]) > 0 ? 1 : 0;
+                    builder.Append((data[i] & fields[j]) > 0 ? 1 : 0);
                 if (i < data.Length - 1)
-                    str += " ";
+                    builder.Append(" ");
             }
 
-            return str;
+            return builder.ToString();
         }
 
         /// <summary>

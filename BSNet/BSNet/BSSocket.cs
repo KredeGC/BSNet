@@ -16,7 +16,9 @@ namespace BSNet
 {
     public abstract class BSSocket : IDisposable
     {
-        // Time
+        /// <summary>
+        /// The elapsed time since the socket was created
+        /// </summary>
 #if !(ENABLE_MONO || ENABLE_IL2CPP)
         public virtual double ElapsedTime => stopwatch.Elapsed.TotalSeconds;
         protected Stopwatch stopwatch;
@@ -26,8 +28,16 @@ namespace BSNet
 #endif
 
         // Properties
-        public virtual double TickRate { protected set; get; }
         public abstract byte[] ProtocolVersion { get; }
+
+        /// <summary>
+        /// The receiving tickrate of this socket
+        /// </summary>
+        public virtual double TickRate { protected set; get; }
+
+        /// <summary>
+        /// The port this socket listens on and sends from
+        /// </summary>
         public virtual int Port { get { return ((IPEndPoint)socket.LocalEndPoint).Port; } }
 
 #if NETWORK_DEBUG
@@ -63,7 +73,7 @@ namespace BSNet
         protected int outGoingBipS = 0;
 
         // Connections & reliable messages
-        protected Dictionary<EndPoint, ClientConnection> connections = new Dictionary<EndPoint, ClientConnection>();
+        protected Dictionary<IPEndPoint, ClientConnection> connections = new Dictionary<IPEndPoint, ClientConnection>();
         protected Dictionary<ConnectionSequence, Packet> unsentMessages = new Dictionary<ConnectionSequence, Packet>();
         protected List<EndPoint> lastTimedOut = new List<EndPoint>();
         protected List<EndPoint> lastHeartBeats = new List<EndPoint>();
@@ -119,7 +129,7 @@ namespace BSNet
 
                 if (disposing)
                 {
-                    foreach (EndPoint endPoint in connections.Keys)
+                    foreach (IPEndPoint endPoint in connections.Keys)
                         Disconnect(endPoint);
                 }
 
@@ -129,7 +139,7 @@ namespace BSNet
         }
 
         /// <summary>
-        /// Call this in a loop to handle incoming and outgoing packet
+        /// Call this in a loop to handle incoming and outgoing packets
         /// </summary>
         public virtual void Update()
         {
@@ -148,7 +158,7 @@ namespace BSNet
         /// <para>Note: For NAT hole-punching, both ends are required to call this</para>
         /// </summary>
         /// <param name="endPoint">The endPoint to establish a connection with</param>
-        public virtual void Connect(EndPoint endPoint)
+        public virtual void Connect(IPEndPoint endPoint)
         {
             if (!connections.TryGetValue(endPoint, out ClientConnection connection))
             {
@@ -171,7 +181,7 @@ namespace BSNet
         /// Attempts to end the connection with the endPoint
         /// </summary>
         /// <param name="endPoint">The endPoint to end the connection with</param>
-        public virtual void Disconnect(EndPoint endPoint)
+        public virtual void Disconnect(IPEndPoint endPoint)
         {
             if (connections.TryGetValue(endPoint, out ClientConnection connection))
             {
@@ -189,7 +199,7 @@ namespace BSNet
         /// <param name="endPoint">The endPoint to send it to</param>
         /// <param name="serializable">The serializable to fill the message</param>
         /// <returns>The sequence of the sent message</returns>
-        public virtual ushort SendMessageUnreliable(EndPoint endPoint, IBSSerializable serializable)
+        public virtual ushort SendMessageUnreliable(IPEndPoint endPoint, IBSSerializable serializable)
         {
             return SendMessageUnreliable(endPoint, writer =>
             {
@@ -203,8 +213,11 @@ namespace BSNet
         /// <param name="endPoint">The endPoint to send it to</param>
         /// <param name="action">The method to fill the buffer with data</param>
         /// <returns>The sequence of the sent message</returns>
-        public virtual ushort SendMessageUnreliable(EndPoint endPoint, Action<IBSStream> action = null)
+        public virtual ushort SendMessageUnreliable(IPEndPoint endPoint, Action<IBSStream> action = null)
         {
+            if (endPoint == null)
+                throw new ArgumentNullException("Argument 'endPoint' is null");
+
             // Check if authenticated
             if (connections.TryGetValue(endPoint, out ClientConnection connection) && connection.Authenticated)
             {
@@ -225,7 +238,7 @@ namespace BSNet
         /// <param name="endPoint">The endPoint to send it to</param>
         /// <param name="serializable">The serializable to fill the message</param>
         /// <returns>The sequence of the sent message</returns>
-        public virtual ushort SendMessageReliable(EndPoint endPoint, IBSSerializable serializable)
+        public virtual ushort SendMessageReliable(IPEndPoint endPoint, IBSSerializable serializable)
         {
             return SendMessageReliable(endPoint, writer =>
             {
@@ -239,8 +252,11 @@ namespace BSNet
         /// <param name="endPoint">The endPoint to send it to</param>
         /// <param name="action">The method to fill the buffer with data</param>
         /// <returns>The sequence of the sent message</returns>
-        public virtual ushort SendMessageReliable(EndPoint endPoint, Action<IBSStream> action = null)
+        public virtual ushort SendMessageReliable(IPEndPoint endPoint, Action<IBSStream> action = null)
         {
+            if (endPoint == null)
+                throw new ArgumentNullException("Argument 'endPoint' is null");
+
             // Check if authenticated
             if (connections.TryGetValue(endPoint, out ClientConnection connection) && connection.Authenticated)
             {
@@ -280,7 +296,7 @@ namespace BSNet
         protected virtual byte[] SendRawMessage(ClientConnection connection, byte type, ulong token, Action<IBSStream> action = null)
         {
             // Increment sequence
-            connection.IncrementSequence(ElapsedTime, TickRate);
+            connection.IncrementSequence(ElapsedTime);
 
             byte[] rawBytes;
             using (BSWriter writer = BSWriter.Get(BSUtility.PACKET_MIN_SIZE))
@@ -319,7 +335,10 @@ namespace BSNet
                     Log(e.ToString(), LogLevel.Error);
                 }
             }
-            catch (Exception) { }
+            catch (Exception e)
+            {
+                Log(e.ToString(), LogLevel.Error);
+            }
 
             outGoingBipS += rawBytes.Length * 8;
 
@@ -345,24 +364,20 @@ namespace BSNet
         /// </summary>
         /// <param name="rawBytes">The bytes to handle</param>
         /// <param name="length">Length of the byte array</param>
-        protected virtual void HandleMessage(EndPoint endPoint, byte[] rawBytes, int length)
+        protected virtual void HandleMessage(IPEndPoint endPoint, byte[] rawBytes, int length)
         {
             inComingBipS += length * 8;
 
             // The length is less than the header, certainly malicious
             if (length < BSUtility.PACKET_MIN_SIZE)
-            {
-                // Don't return the buffer, we hopefully won't be needing it again
-                // BSPool.ReturnBuffer(rawBytes);
                 return;
-            }
 
             // Read the buffer and determine CRC
             using (BSReader reader = BSReader.Get(rawBytes, length))
             {
                 if (!reader.SerializeChecksum(ProtocolVersion))
                 {
-                    Log($"Mismatching checksum received from {endPoint}", LogLevel.Warning);
+                    Log($"Mismatching checksum received from {endPoint}. Possibly corrupted", LogLevel.Warning);
                     return;
                 }
 
@@ -509,7 +524,7 @@ namespace BSNet
                     HandleMessage(endPoint, rawBytes, length);
                 }
 #else
-                HandleMessage(endPoint, rawBytes, length);
+                HandleMessage((IPEndPoint)endPoint, rawBytes, length);
 #endif
             }
 
@@ -530,10 +545,10 @@ namespace BSNet
 
 
             // Clean up old endPoints
-            foreach (EndPoint ep in lastTimedOut)
+            foreach (IPEndPoint ep in lastTimedOut)
             {
                 connections.Remove(ep);
-                OnDisconnect((IPEndPoint)ep);
+                OnDisconnect(ep);
             }
 
 
@@ -541,7 +556,7 @@ namespace BSNet
             var resendMessages = unsentMessages.Where(i => i.Value.Time < resendTime).ToArray();
             foreach (var data in resendMessages)
             {
-                EndPoint ep = data.Key.EndPoint;
+                IPEndPoint ep = data.Key.EndPoint;
                 if (connections.TryGetValue(ep, out ClientConnection connection))
                 {
                     // Get CRC
@@ -584,7 +599,7 @@ namespace BSNet
 
 
             // Send a heartbeat if nothing has been sent this tick
-            foreach (EndPoint ep in lastHeartBeats)
+            foreach (IPEndPoint ep in lastHeartBeats)
             {
                 if (connections.TryGetValue(ep, out ClientConnection connection) && connection.LastSent < beatTime)
                     SendHeartbeat(connection);

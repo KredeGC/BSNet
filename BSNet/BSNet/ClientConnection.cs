@@ -5,24 +5,74 @@ namespace BSNet
 {
     public class ClientConnection
     {
-        public EndPoint AddressPoint { private set; get; }
-        public double RTT { private set; get; }
-        public double PacketLoss { private set; get; } // Not implemented
-        public ushort LocalSequence { private set; get; }
-        public ushort RemoteSequence { private set; get; }
-        public uint AckBits { private set; get; }
-        public double LastSent { private set; get; }
-        public double LastReceived { private set; get; }
+        /// <summary>
+        /// The address and port of this connection
+        /// </summary>
+        public IPEndPoint AddressPoint { private set; get; }
 
+        /// <summary>
+        /// The estimated round-trip-time
+        /// <para/>Note: Uses an exponentially smoothed average
+        /// </summary>
+        public double RTT { private set; get; }
+
+        /// <summary>
+        /// The estimated packet loss
+        /// <para/>Note: Uses an exponentially smoothed average
+        /// </summary>
+        public double PacketLoss { private set; get; }
+
+        /// <summary>
+        /// The sequence number of the last sent packet
+        /// </summary>
+        public ushort LocalSequence { private set; get; }
+
+        /// <summary>
+        /// The sequence number of the last received packet
+        /// </summary>
+        public ushort RemoteSequence { private set; get; }
+
+        /// <summary>
+        /// The bitfield of the last 32 received packets
+        /// </summary>
+        public uint AckBits { private set; get; }
+
+        /// <summary>
+        /// The last time we sent this client a message
+        /// </summary>
+        public double LastSent { private set; get; }
+
+        /// <summary>
+        /// The last time we received a message from this client
+        /// </summary>
+        public double LastReceived { private set; get; }
+        
+
+        /// <summary>
+        /// The locally generated token
+        /// </summary>
         public ulong LocalToken { private set; get; }
+
+        /// <summary>
+        /// The remotely received token
+        /// </summary>
         public ulong RemoteToken { private set; get; }
+
+        /// <summary>
+        /// Whether this client has been authenticated or not
+        /// <para/>Messages can only be sent after authentication
+        /// </summary>
         public bool Authenticated { private set; get; }
+
+        /// <summary>
+        /// The shared token, used in every message after authentication
+        /// </summary>
         public ulong Token { get { return LocalToken ^ RemoteToken; } }
 
         private ushort[] acknowledgements = new ushort[BSUtility.RTT_BUFFER_SIZE];
         private double[] roundTrips = new double[BSUtility.RTT_BUFFER_SIZE];
 
-        public ClientConnection(EndPoint endPoint, double time, ulong localToken, ulong remoteToken)
+        public ClientConnection(IPEndPoint endPoint, double time, ulong localToken, ulong remoteToken)
         {
             AddressPoint = endPoint;
             RTT = 0;
@@ -39,10 +89,10 @@ namespace BSNet
         }
 
         /// <summary>
-        /// Increments the local sequence and updates the timer
+        /// Increments the local sequence and updates the timer and estimated packet loss
         /// </summary>
         /// <param name="time">The current time</param>
-        public void IncrementSequence(double time, double tickRate)
+        public void IncrementSequence(double time)
         {
             // Calculate packet loss
             int packetsLost = 0;
@@ -111,7 +161,7 @@ namespace BSNet
         }
 
         /// <summary>
-        /// Returns whether or not we have received an acknowledgement for this sequence number
+        /// Returns whether or not we have received an acknowledgement for this sequence number and buffers it
         /// </summary>
         /// <param name="sentSequence">The sequence number to check against, and subsequently buffer</param>
         /// <returns>Whether we have already received an acknowledgement for this sequence number</returns>

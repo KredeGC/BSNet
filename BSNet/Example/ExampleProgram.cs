@@ -211,6 +211,9 @@ namespace BSNet.Example
                     case "bot":
                         AddBot(args, botClients);
                         break;
+                    case "stats":
+                        Server.PrintNetworkStats();
+                        break;
                     case "version":
                         VersionCommands(args);
                         break;
