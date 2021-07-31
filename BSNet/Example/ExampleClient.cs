@@ -59,19 +59,19 @@ namespace BSNet.Example
             if (verbose)
                 Log($"{endPoint.ToString()} connected", LogLevel.Info);
 
-            // Send corrupt packet
-            SendMessageReliable(endPoint, writer =>
-            {
-                byte[] rawBytes = new byte[20];
-                Cryptography.GetBytes(rawBytes);
-                writer.SerializeBytes(rawBytes);
-            });
+            //// Send corrupt packet
+            //SendMessageReliable(endPoint, writer =>
+            //{
+            //    byte[] rawBytes = new byte[20];
+            //    Cryptography.GetBytes(rawBytes);
+            //    writer.SerializeBytes(rawBytes);
+            //});
 
-            //// Create a packet
-            //ExamplePacket serializable = new ExamplePacket($"Hello network to {endPoint}!", 3.1415f);
+            // Create a packet
+            ExamplePacket serializable = new ExamplePacket($"Hello network to {endPoint}!", 3.1415f);
 
-            //// Serialize the message and send it to the connected IPEndPoint
-            //SendMessageReliable(endPoint, serializable);
+            // Serialize the message and send it to the connected IPEndPoint
+            SendMessageReliable(endPoint, serializable);
         }
 
         // Called when a connection has been lost with this IPEndPoint
@@ -94,7 +94,7 @@ namespace BSNet.Example
                 Log(emptySerializable.TestString, LogLevel.Info);
         }
 
-        protected override void OnMessageAcknowledged(ushort sequence)
+        protected override void OnReceiveAcknowledgement(ushort sequence)
         {
             //if (verbose)
             //    Log($"Packet {sequence} acknowledged", LogLevel.Info);

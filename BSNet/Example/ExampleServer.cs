@@ -103,7 +103,7 @@ namespace BSNet.Example
             Log(emptySerializable.TestString, LogLevel.Info);
         }
 
-        protected override void OnMessageAcknowledged(ushort sequence)
+        protected override void OnReceiveAcknowledgement(ushort sequence)
         {
             //Log($"Packet {sequence} acknowledged", LogLevel.Info);
         }

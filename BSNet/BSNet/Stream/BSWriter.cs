@@ -27,14 +27,6 @@ namespace BSNet.Stream
             }
         }
 
-        public int Remainder // 8 - (bitPos - 1)
-        {
-            get
-            {
-                return (9 - bitPos) % BSUtility.BITS;
-            }
-        }
-
         private byte[] internalStream;
         private int bytePos = 0;
         private int bitPos = 1;

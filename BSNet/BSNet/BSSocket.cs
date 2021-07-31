@@ -462,7 +462,7 @@ namespace BSNet
                                             unsentMessages.Remove(conSeq);
                                         }
                                         if (!connection.HasReceivedAcknowledgement(seq, TickRate))
-                                            OnMessageAcknowledged(seq); // Return acknowledgement to application
+                                            OnReceiveAcknowledgement(seq); // Return acknowledgement to application
                                     }
                                 }
 
@@ -653,7 +653,7 @@ namespace BSNet
         /// Called when this socket receives an acknowledgement for a previously sent message, with the given sequence number
         /// </summary>
         /// <param name="sequence">The sequence number that was acknowledged</param>
-        protected abstract void OnMessageAcknowledged(ushort sequence);
+        protected abstract void OnReceiveAcknowledgement(ushort sequence);
 
         /// <summary>
         /// Called when a connection is established with a remote endPoint
