@@ -35,7 +35,7 @@ namespace BSNet
         public const int TIMEOUT = 10; // Timeout for connections
         public const int BITS = 8; // Bits in a byte
         public const int RTT_BUFFER_SIZE = 128; // Needs to be larger than AckBits
-        public const int MAX_POOLING = 4;
+        public const int MAX_POOLING = 4; // Max amount of objects to pool
 
         public const int PACKET_MIN_SIZE =
             sizeof(uint) + // CRC32 of version + packet (4 bytes)

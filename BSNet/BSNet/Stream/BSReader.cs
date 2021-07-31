@@ -146,7 +146,8 @@ namespace BSNet.Stream
             return true;
         }
 
-        // Padding
+        #region Padding
+        /// <inheritdoc/>
         public int PadToEnd()
         {
             int remaining = (BSUtility.PACKET_MAX_SIZE - 4) * BSUtility.BITS - TotalBits;
@@ -154,32 +155,38 @@ namespace BSNet.Stream
             return remaining;
         }
 
+        /// <inheritdoc/>
         public int PadToByte()
         {
             int remaining = (8 - TotalBits % 8) % 8;
             SerializeBytes(remaining);
             return remaining;
         }
+        #endregion
 
-        // Unsigned
+        #region Unsigned
+        /// <inheritdoc/>
         public byte SerializeByte(byte value = default(byte), int bitCount = sizeof(byte) * BSUtility.BITS)
         {
             byte[] bytes = SerializeBytes(bitCount);
             return bytes[0];
         }
 
+        /// <inheritdoc/>
         public ushort SerializeUShort(ushort value = default(ushort), int bitCount = sizeof(ushort) * BSUtility.BITS)
         {
             ulong val = SerializeULong(value, bitCount);
             return (ushort)val;
         }
 
+        /// <inheritdoc/>
         public uint SerializeUInt(uint value = default(uint), int bitCount = sizeof(uint) * BSUtility.BITS)
         {
             ulong val = SerializeULong(value, bitCount);
             return (uint)val;
         }
 
+        /// <inheritdoc/>
         public ulong SerializeULong(ulong value = default(ulong), int bitCount = sizeof(ulong) * BSUtility.BITS)
         {
             byte[] bytes = SerializeBytes(bitCount);
@@ -191,8 +198,10 @@ namespace BSNet.Stream
 
             return val;
         }
+        #endregion
 
-        // Signed
+        #region Signed
+        /// <inheritdoc/>
         public sbyte SerializeSByte(sbyte value = default(sbyte), int bitCount = sizeof(sbyte) * BSUtility.BITS)
         {
             byte val = SerializeByte(0, bitCount);
@@ -200,6 +209,7 @@ namespace BSNet.Stream
             return zagzig;
         }
 
+        /// <inheritdoc/>
         public short SerializeShort(short value = default(short), int bitCount = sizeof(short) * BSUtility.BITS)
         {
             ushort val = SerializeUShort(0, bitCount);
@@ -207,6 +217,7 @@ namespace BSNet.Stream
             return zagzig;
         }
 
+        /// <inheritdoc/>
         public int SerializeInt(int value = default(int), int bitCount = sizeof(int) * BSUtility.BITS)
         {
             uint val = SerializeUInt(0, bitCount);
@@ -214,14 +225,17 @@ namespace BSNet.Stream
             return zagzig;
         }
 
+        /// <inheritdoc/>
         public long SerializeLong(long value = default(long), int bitCount = sizeof(long) * BSUtility.BITS)
         {
             ulong val = SerializeULong(0, bitCount);
             long zagzig = (long)(val >> 1) ^ (-(long)(val & 1));
             return zagzig;
         }
+        #endregion
 
-        // Floating point
+        #region Floating point
+        /// <inheritdoc/>
         public float SerializeFloat(BoundedRange range, float value = default(float))
         {
             uint quanValue = SerializeUInt(0, range.BitsRequired);
@@ -229,14 +243,17 @@ namespace BSNet.Stream
             return range.Dequantize(quanValue);
         }
 
+        /// <inheritdoc/>
         public float SerializeHalf(float value = default(float))
         {
             ushort quanValue = SerializeUShort();
 
             return HalfPrecision.Dequantize(quanValue);
         }
+        #endregion
 
-        // Vectors & Quaternions
+        #region Vectors & Quaternions
+        /// <inheritdoc/>
         public Vector2 SerializeVector2(BoundedRange[] range, Vector2 value = default(Vector2))
         {
             float x = SerializeFloat(range[0]);
@@ -245,6 +262,7 @@ namespace BSNet.Stream
             return new Vector2(x, y);
         }
 
+        /// <inheritdoc/>
         public Vector3 SerializeVector3(BoundedRange[] range, Vector3 value = default(Vector3))
         {
             float x = SerializeFloat(range[0]);
@@ -254,6 +272,7 @@ namespace BSNet.Stream
             return new Vector3(x, y, z);
         }
 
+        /// <inheritdoc/>
         public Vector4 SerializeVector4(BoundedRange[] range, Vector4 value = default(Vector4))
         {
             float x = SerializeFloat(range[0]);
@@ -264,6 +283,7 @@ namespace BSNet.Stream
             return new Vector4(x, y, z, w);
         }
 
+        /// <inheritdoc/>
         public Quaternion SerializeQuaternion(int bitsPerElement = 12, Quaternion value = default(Quaternion))
         {
             uint m = SerializeUInt(0, 2);
@@ -275,23 +295,28 @@ namespace BSNet.Stream
 
             return SmallestThree.Dequantize(quanQuat, bitsPerElement);
         }
+        #endregion
 
-        // String
+        #region String
+        /// <inheritdoc/>
         public string SerializeString(Encoding encoding, string value = null)
         {
-            if (encoding.Equals(null)) throw new ArgumentNullException(nameof(encoding));
+            if (encoding.Equals(null))
+                throw new ArgumentNullException(nameof(encoding));
 
-            int length = SerializeInt();
+            int length = SerializeInt() * BSUtility.BITS;
 
             if (length > 0)
             {
-                byte[] bytes = SerializeBytes(length * BSUtility.BITS);
+                byte[] bytes = SerializeBytes(length);
                 return encoding.GetString(bytes);
             }
             return string.Empty;
         }
+        #endregion
 
-        // IPs
+        #region IPs
+        /// <inheritdoc/>
         public IPAddress SerializeIPAddress(IPAddress ipAddress)
         {
             byte[] addressBytes = SerializeBytes(4 * BSUtility.BITS);
@@ -299,6 +324,7 @@ namespace BSNet.Stream
             return new IPAddress(addressBytes);
         }
 
+        /// <inheritdoc/>
         public IPEndPoint SerializeIPEndPoint(IPEndPoint endPoint)
         {
             IPAddress ipAddress = SerializeIPAddress(null);
@@ -307,28 +333,29 @@ namespace BSNet.Stream
 
             return new IPEndPoint(ipAddress, port);
         }
+        #endregion
 
-        // Bytes
+        #region Bytes
+        /// <inheritdoc/>
         public byte[] SerializeBytes(int bitCount, byte[] data = null, bool trimRight = false)
         {
             return Read(bitCount);
         }
 
+        /// <inheritdoc/>
         public byte[] SerializeBytes(byte[] data = null)
         {
             return Read(data.Length * BSUtility.BITS);
         }
+        #endregion
 
         // Read internally
         private byte[] Read(int bitCount)
         {
             if (bitCount == 0) return new byte[0];
 
-            if (bitCount < 0)
-                throw new ArgumentOutOfRangeException("Attempting to read a negative bitCount");
-
-            if (bitCount > TotalBits)
-                throw new ArgumentOutOfRangeException("Attempting to read further than stream");
+            if (bitCount < 0 || bitCount > TotalBits)
+                throw new ArgumentOutOfRangeException(nameof(bitCount));
 
             // The total length of the bytes
             int length = (bitCount - 1) / BSUtility.BITS + 1;

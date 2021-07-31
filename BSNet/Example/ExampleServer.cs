@@ -99,14 +99,13 @@ namespace BSNet.Example
 
             // Deserialize the message
             emptySerializable.Serialize(reader);
-
+            
             Log(emptySerializable.TestString, LogLevel.Info);
         }
 
         protected override void OnMessageAcknowledged(ushort sequence)
         {
-            //if (verbose)
-            //    Log($"Packet {sequence} acknowledged", LogLevel.Info);
+            //Log($"Packet {sequence} acknowledged", LogLevel.Info);
         }
 
         protected override void OnNetworkStatistics(int outGoingBipS, int inComingBipS)

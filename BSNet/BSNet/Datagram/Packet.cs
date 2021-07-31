@@ -8,7 +8,7 @@ namespace BSNet.Datagram
     {
         private static Queue<Packet> packetPool = new Queue<Packet>();
 
-        public EndPoint AddressPoint { private set; get; }
+        public IPEndPoint AddressPoint { private set; get; }
         public byte[] Bytes { private set; get; }
         public double Time { private set; get; }
 
@@ -22,7 +22,7 @@ namespace BSNet.Datagram
         /// <param name="length">The size of the packet</param>
         /// <param name="time">The time this packet was received/sent</param>
         /// <returns>A new packet</returns>
-        public static Packet GetPacket(EndPoint endPoint, byte[] bytes, int length, double time)
+        public static Packet GetPacket(IPEndPoint endPoint, byte[] bytes, int length, double time)
         {
             lock (packetPool)
             {
@@ -48,7 +48,7 @@ namespace BSNet.Datagram
         /// <param name="bytes">The data in the packet</param>
         /// <param name="time">The time this packet was received/sent</param>
         /// <returns>A new packet</returns>
-        public static Packet GetPacket(EndPoint endPoint, byte[] bytes, double time)
+        public static Packet GetPacket(IPEndPoint endPoint, byte[] bytes, double time)
         {
             lock (packetPool)
             {

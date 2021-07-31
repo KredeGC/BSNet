@@ -59,11 +59,19 @@ namespace BSNet.Example
             if (verbose)
                 Log($"{endPoint.ToString()} connected", LogLevel.Info);
 
-            // Create a packet
-            ExamplePacket serializable = new ExamplePacket($"Hello network to {endPoint}!");
+            // Send corrupt packet
+            SendMessageReliable(endPoint, writer =>
+            {
+                byte[] rawBytes = new byte[20];
+                Cryptography.GetBytes(rawBytes);
+                writer.SerializeBytes(rawBytes);
+            });
 
-            // Serialize the message and send it to the connected IPEndPoint
-            SendMessageReliable(endPoint, serializable);
+            //// Create a packet
+            //ExamplePacket serializable = new ExamplePacket($"Hello network to {endPoint}!", 3.1415f);
+
+            //// Serialize the message and send it to the connected IPEndPoint
+            //SendMessageReliable(endPoint, serializable);
         }
 
         // Called when a connection has been lost with this IPEndPoint
