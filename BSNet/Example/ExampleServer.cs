@@ -95,14 +95,13 @@ namespace BSNet.Example
             emptySerializable.Serialize(reader);
 
             // Log the result
-            //Log(emptySerializable.TestString, LogLevel.Info);
+            Log(emptySerializable.TestString, LogLevel.Info);
         }
 
-        protected override void OnReceiveAcknowledgement(ushort sequence)
-        {
-            //Log($"Packet {sequence} acknowledged", LogLevel.Info);
-        }
+        // Called when we receive an acknowledgement for a packet from this IPEndPoint
+        protected override void OnReceiveAcknowledgement(IPEndPoint endPoint, ushort sequence) { }
 
+        // Called once per second, regarding the rough estimates of network traffic
         protected override void OnNetworkStatistics(int outGoingBipS, int inComingBipS)
         {
             OutgoingBipS = outGoingBipS;

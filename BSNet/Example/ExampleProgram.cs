@@ -8,19 +8,20 @@ namespace BSNet.Example
     {
         public static void Main(string[] commands)
         {
+            //MainP2P();
             MainServer(commands);
         }
 
         private static void MainP2P()
         {
             // Testing a P2P implementation
-            ExampleClient client1 = new ExampleClient(1609, "127.0.0.1", 1615, true);
-            ExampleClient client2 = new ExampleClient(1615, "127.0.0.1", 1609);
+            ExamplePeer peer1 = new ExamplePeer(1609, "127.0.0.1", 1615);
+            ExamplePeer peer2 = new ExamplePeer(1615, "127.0.0.1", 1609);
 
             while (true)
             {
-                client1.Update();
-                client2.Update();
+                peer1.Update();
+                peer2.Update();
 
                 if (Console.KeyAvailable)
                 {
@@ -31,14 +32,14 @@ namespace BSNet.Example
                     }
                     else if (key == ConsoleKey.R)
                     {
-                        client2.Dispose();
-                        client2 = new ExampleClient(1615, "127.0.0.1", 1609);
+                        peer2.Dispose();
+                        peer2 = new ExamplePeer(1615, "127.0.0.1", 1609);
                     }
                 }
             }
 
-            client1.Dispose();
-            client2.Dispose();
+            peer1.Dispose();
+            peer2.Dispose();
         }
 
         private static ExampleServer Server { get; set; }

@@ -458,7 +458,7 @@ namespace BSNet
                                             unsentMessages.Remove(conSeq);
                                         }
                                         if (!connection.HasReceivedAcknowledgement(seq, TickRate))
-                                            OnReceiveAcknowledgement(seq); // Return acknowledgement to application
+                                            OnReceiveAcknowledgement(endPoint, seq); // Return acknowledgement to application
                                     }
                                 }
 
@@ -635,21 +635,27 @@ namespace BSNet
         }
 
 
-        protected virtual void OnNetworkStatistics(int outGoingBipS, int inComingBipS)
-        {
-            /*foreach (ClientConnection connection in connections.Values)
-                Log(connection.RTT, LogLevel.Info);
-            Log($"Outgoing bits in the last second: {outGoingBipS / 1000f} Kbits/S", LogLevel.Info);
-            Log($"Incoming bits in the last second: {inComingBipS / 1000f} Kbits/S", LogLevel.Info);*/
-        }
+        /// <summary>
+        /// Called once per second, containing information about traffic in the last second
+        /// </summary>
+        /// <param name="outGoingBipS">The outgoing bits received in the last second</param>
+        /// <param name="inComingBipS">The incoming bits received in the last second</param>
+        protected virtual void OnNetworkStatistics(int outGoingBipS, int inComingBipS) { }
 
+        /// <summary>
+        /// Called when an event happens in the socket, such as warnings and errors
+        /// <para/>Possible events can be, but are not limited to: packet corruption, packet loss, socket exceptions and connection drops
+        /// <para/>Can also be user-created events like in the examples
+        /// </summary>
+        /// <param name="obj">The object that's been logged</param>
+        /// <param name="level">The level of severity, ranging from least to most severe: Info, Warning, Error</param>
         protected abstract void Log(object obj, LogLevel level);
 
         /// <summary>
         /// Called when this socket receives an acknowledgement for a previously sent message, with the given sequence number
         /// </summary>
         /// <param name="sequence">The sequence number that was acknowledged</param>
-        protected abstract void OnReceiveAcknowledgement(ushort sequence);
+        protected abstract void OnReceiveAcknowledgement(IPEndPoint endPoint, ushort sequence);
 
         /// <summary>
         /// Called when a connection is established with a remote endPoint
