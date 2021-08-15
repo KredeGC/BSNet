@@ -18,6 +18,7 @@ namespace BSNet.Stream
 
         public bool Writing { get { return false; } }
         public bool Reading { get { return true; } }
+        public bool Corrupt { get; private set; } = false;
 
         public int TotalBits
         {
@@ -102,6 +103,7 @@ namespace BSNet.Stream
                 {
                     reader.bytePos = 0;
                     reader.bitPos = 1;
+                    reader.Corrupt = false;
                     readerPool.Enqueue(reader);
                 }
             }
@@ -114,16 +116,20 @@ namespace BSNet.Stream
             byte[] crcBytes = BSPool.GetBuffer(4);
             byte[] headerBytes = internalStream;
 
+            // Read the data
             byte[] data = BSPool.GetBuffer(headerBytes.Length - crcBytes.Length);
             Buffer.BlockCopy(headerBytes, 0, crcBytes, 0, crcBytes.Length);
             Buffer.BlockCopy(headerBytes, crcBytes.Length, data, 0, data.Length);
 
+            // Combine the data with version
             byte[] combinedBytes = BSPool.GetBuffer(version.Length + data.Length);
             Buffer.BlockCopy(version, 0, combinedBytes, 0, version.Length);
             Buffer.BlockCopy(data, 0, combinedBytes, version.Length, data.Length);
 
+            // Generate checksum to compare against
             byte[] generatedBytes = Cryptography.CRC32Bytes(combinedBytes);
 
+            // Compare the checksum
             for (int i = 0; i < crcBytes.Length; i++)
             {
                 if (!crcBytes[i].Equals(generatedBytes[i]))
@@ -168,6 +174,7 @@ namespace BSNet.Stream
         /// <inheritdoc/>
         public byte SerializeByte(byte value = default(byte), int bitCount = sizeof(byte) * BSUtility.BITS)
         {
+            if (Corrupt) return 0;
             byte[] bytes = SerializeBytes(bitCount);
             return bytes[0];
         }
@@ -175,6 +182,7 @@ namespace BSNet.Stream
         /// <inheritdoc/>
         public ushort SerializeUShort(ushort value = default(ushort), int bitCount = sizeof(ushort) * BSUtility.BITS)
         {
+            if (Corrupt) return 0;
             ulong val = SerializeULong(value, bitCount);
             return (ushort)val;
         }
@@ -182,6 +190,7 @@ namespace BSNet.Stream
         /// <inheritdoc/>
         public uint SerializeUInt(uint value = default(uint), int bitCount = sizeof(uint) * BSUtility.BITS)
         {
+            if (Corrupt) return 0;
             ulong val = SerializeULong(value, bitCount);
             return (uint)val;
         }
@@ -189,6 +198,7 @@ namespace BSNet.Stream
         /// <inheritdoc/>
         public ulong SerializeULong(ulong value = default(ulong), int bitCount = sizeof(ulong) * BSUtility.BITS)
         {
+            if (Corrupt) return 0;
             byte[] bytes = SerializeBytes(bitCount);
 
             ulong val = 0;
@@ -204,6 +214,7 @@ namespace BSNet.Stream
         /// <inheritdoc/>
         public sbyte SerializeSByte(sbyte value = default(sbyte), int bitCount = sizeof(sbyte) * BSUtility.BITS)
         {
+            if (Corrupt) return 0;
             byte val = SerializeByte(0, bitCount);
             sbyte zagzig = (sbyte)((val >> 1) ^ (-(sbyte)(val & 1)));
             return zagzig;
@@ -212,6 +223,7 @@ namespace BSNet.Stream
         /// <inheritdoc/>
         public short SerializeShort(short value = default(short), int bitCount = sizeof(short) * BSUtility.BITS)
         {
+            if (Corrupt) return 0;
             ushort val = SerializeUShort(0, bitCount);
             short zagzig = (short)((val >> 1) ^ (-(short)(val & 1)));
             return zagzig;
@@ -220,6 +232,7 @@ namespace BSNet.Stream
         /// <inheritdoc/>
         public int SerializeInt(int value = default(int), int bitCount = sizeof(int) * BSUtility.BITS)
         {
+            if (Corrupt) return 0;
             uint val = SerializeUInt(0, bitCount);
             int zagzig = (int)((val >> 1) ^ (-(int)(val & 1)));
             return zagzig;
@@ -228,6 +241,7 @@ namespace BSNet.Stream
         /// <inheritdoc/>
         public long SerializeLong(long value = default(long), int bitCount = sizeof(long) * BSUtility.BITS)
         {
+            if (Corrupt) return 0;
             ulong val = SerializeULong(0, bitCount);
             long zagzig = (long)(val >> 1) ^ (-(long)(val & 1));
             return zagzig;
@@ -238,6 +252,7 @@ namespace BSNet.Stream
         /// <inheritdoc/>
         public float SerializeFloat(BoundedRange range, float value = default(float))
         {
+            if (Corrupt) return 0f;
             uint quanValue = SerializeUInt(0, range.BitsRequired);
 
             return range.Dequantize(quanValue);
@@ -246,6 +261,7 @@ namespace BSNet.Stream
         /// <inheritdoc/>
         public float SerializeHalf(float value = default(float))
         {
+            if (Corrupt) return 0f;
             ushort quanValue = SerializeUShort();
 
             return HalfPrecision.Dequantize(quanValue);
@@ -256,6 +272,7 @@ namespace BSNet.Stream
         /// <inheritdoc/>
         public Vector2 SerializeVector2(BoundedRange[] range, Vector2 value = default(Vector2))
         {
+            if (Corrupt) return new Vector2(0f, 0f);
             float x = SerializeFloat(range[0]);
             float y = SerializeFloat(range[1]);
 
@@ -265,6 +282,7 @@ namespace BSNet.Stream
         /// <inheritdoc/>
         public Vector3 SerializeVector3(BoundedRange[] range, Vector3 value = default(Vector3))
         {
+            if (Corrupt) return new Vector3(0f, 0f, 0f);
             float x = SerializeFloat(range[0]);
             float y = SerializeFloat(range[1]);
             float z = SerializeFloat(range[2]);
@@ -275,6 +293,7 @@ namespace BSNet.Stream
         /// <inheritdoc/>
         public Vector4 SerializeVector4(BoundedRange[] range, Vector4 value = default(Vector4))
         {
+            if (Corrupt) return new Vector4(0f, 0f, 0f, 0f);
             float x = SerializeFloat(range[0]);
             float y = SerializeFloat(range[1]);
             float z = SerializeFloat(range[2]);
@@ -286,6 +305,11 @@ namespace BSNet.Stream
         /// <inheritdoc/>
         public Quaternion SerializeQuaternion(int bitsPerElement = 12, Quaternion value = default(Quaternion))
         {
+#if !(ENABLE_MONO || ENABLE_IL2CPP)
+            if (Corrupt) return Quaternion.Identity;
+#else
+            if (Corrupt) return Quaternion.identity;
+#endif
             uint m = SerializeUInt(0, 2);
             uint a = SerializeUInt(0, bitsPerElement);
             uint b = SerializeUInt(0, bitsPerElement);
@@ -306,12 +330,13 @@ namespace BSNet.Stream
 
             int length = SerializeInt() * BSUtility.BITS;
 
-            if (length > 0)
-            {
-                byte[] bytes = SerializeBytes(length);
-                return encoding.GetString(bytes);
-            }
-            return string.Empty;
+            if (Corrupt) return string.Empty;
+
+            byte[] bytes = SerializeBytes(length);
+
+            if (Corrupt) return string.Empty;
+
+            return encoding.GetString(bytes);
         }
         #endregion
 
@@ -319,6 +344,8 @@ namespace BSNet.Stream
         /// <inheritdoc/>
         public IPAddress SerializeIPAddress(IPAddress ipAddress)
         {
+            if (Corrupt) return IPAddress.Any;
+
             byte[] addressBytes = SerializeBytes(4 * BSUtility.BITS);
 
             return new IPAddress(addressBytes);
@@ -327,7 +354,11 @@ namespace BSNet.Stream
         /// <inheritdoc/>
         public IPEndPoint SerializeIPEndPoint(IPEndPoint endPoint)
         {
+            if (Corrupt) return new IPEndPoint(IPAddress.Any, 0);
+
             IPAddress ipAddress = SerializeIPAddress(null);
+
+            if (Corrupt) return new IPEndPoint(IPAddress.Any, 0);
 
             ushort port = SerializeUShort();
 
@@ -354,8 +385,14 @@ namespace BSNet.Stream
         {
             if (bitCount == 0) return new byte[0];
 
-            if (bitCount < 0 || bitCount > TotalBits)
-                throw new ArgumentOutOfRangeException(nameof(bitCount));
+            if (Corrupt || bitCount < 0 || bitCount > TotalBits)
+            {
+                Corrupt = true;
+                return null;
+            }
+
+            //if (bitCount < 0 || bitCount > TotalBits)
+            //    throw new ArgumentOutOfRangeException(nameof(bitCount));
 
             // The total length of the bytes
             int length = (bitCount - 1) / BSUtility.BITS + 1;

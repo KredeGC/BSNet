@@ -7,7 +7,7 @@ namespace BSNet.Example
 {
     public class ExampleServer : BSSocket
     {
-        public override byte[] ProtocolVersion => new byte[] { 0x00, 0x00, 0x00, 0x01 };
+        public override byte[] ProtocolVersion => new byte[] { 0xBE, 0xEB, 0xB0, 0x0B };
 
         public int OutgoingBipS { get; private set; }
         public int IncomingBipS { get; private set; }
@@ -17,12 +17,6 @@ namespace BSNet.Example
         public ExampleServer(int localPort) : base(localPort)
         {
             Log("Server starting", LogLevel.Info);
-
-#if NETWORK_DEBUG
-            SimulatedPacketLatency = 250; // 250ms
-            SimulatedPacketLoss = 250; // 25%
-            SimulatedPacketCorruption = 1; // 0.1%
-#endif
         }
 
         protected override void Dispose(bool disposing)
@@ -36,8 +30,8 @@ namespace BSNet.Example
         // Print outgoing + incoming bits per second
         public void PrintNetworkStats()
         {
-            Log($"Outgoing bits in the last second: {OutgoingBipS / 1000f} Kbits", LogLevel.Info);
-            Log($"Incoming bits in the last second: {IncomingBipS / 1000f} Kbits", LogLevel.Info);
+            Log($"Outgoing bits in the last second: {OutgoingBipS / 1000d} Kbits", LogLevel.Info);
+            Log($"Incoming bits in the last second: {IncomingBipS / 1000d} Kbits", LogLevel.Info);
         }
 
         // Print current connections and their stats
@@ -50,11 +44,11 @@ namespace BSNet.Example
                 {
                     Log($"{connection.AddressPoint} - {Math.Round(connection.RTT * 1000)}ms latency - {Math.Round(connection.PacketLoss * 100)}% packet loss", LogLevel.Info);
                     counter++;
-                    if (counter > amount)
+                    if (counter >= amount)
                         break;
                 }
             }
-            Log($"{connections.Count} players connected", LogLevel.Info);
+            Log($"Showing {counter} out of {connections.Count} connected players", LogLevel.Info);
         }
 
         // For error logging
@@ -99,8 +93,9 @@ namespace BSNet.Example
 
             // Deserialize the message
             emptySerializable.Serialize(reader);
-            
-            Log(emptySerializable.TestString, LogLevel.Info);
+
+            // Log the result
+            //Log(emptySerializable.TestString, LogLevel.Info);
         }
 
         protected override void OnReceiveAcknowledgement(ushort sequence)

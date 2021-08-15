@@ -41,9 +41,9 @@ namespace BSNet
 
 #if NETWORK_DEBUG
         // Network debugging
-        public virtual int SimulatedPacketLoss { set; get; } // 0-1000
-        public virtual int SimulatedPacketLatency { set; get; } // 0-1000
-        public virtual int SimulatedPacketCorruption { set; get; } // 0-1000
+        public virtual double SimulatedPacketLoss { set; get; } // 0-1000
+        public virtual double SimulatedPacketLatency { set; get; } // 0-1000
+        public virtual double SimulatedPacketCorruption { set; get; } // 0-1000
 
         protected System.Random random = new System.Random();
 
@@ -56,15 +56,6 @@ namespace BSNet
         protected Socket socket;
         protected const int SIO_UDP_CONNRESET = -1744830452;
         protected bool _disposing;
-
-        // P2P Protocol
-        //protected const int headerSize =
-        //    sizeof(uint) + // CRC32 of version + packet (4 bytes)
-        //    sizeof(byte) + // ConnectionType (2 bits)
-        //    sizeof(ushort) + // Sequence of this packet (2 bytes)
-        //    sizeof(ushort) + // Acknowledgement for most recent received packet (2 bytes)
-        //    sizeof(uint) + // Bitfield of acknowledgements before most recent (4 bytes)
-        //    sizeof(ulong); // Token or LocalToken if not authenticated (8 bytes)
 
         // Network statistics
         protected double nextBip;
@@ -331,6 +322,13 @@ namespace BSNet
             if (rawBytes.Length > BSUtility.PACKET_MAX_SIZE)
                 throw new ArgumentOutOfRangeException("Packet size too big");
 
+            outGoingBipS += rawBytes.Length * 8;
+
+#if NETWORK_DEBUG
+            if (SimulatedPacketLoss > 0 && random.NextDouble() < SimulatedPacketLoss)
+                return rawBytes;
+#endif
+
             try
             {
                 socket.SendTo(rawBytes, rawBytes.Length, SocketFlags.None, connection.AddressPoint);
@@ -349,8 +347,6 @@ namespace BSNet
             {
                 Log(e.ToString(), LogLevel.Error);
             }
-
-            outGoingBipS += rawBytes.Length * 8;
 
             return rawBytes;
         }
@@ -513,11 +509,11 @@ namespace BSNet
 
 #if NETWORK_DEBUG
                     // Simulate packet loss
-                    if (SimulatedPacketLoss > 0 && random.Next(1000) < SimulatedPacketLoss)
+                    if (SimulatedPacketLoss > 0 && random.NextDouble() < SimulatedPacketLoss)
                         continue;
 
                     // Simulate packet corruption
-                    if (SimulatedPacketCorruption > 0 && random.Next(1000) < SimulatedPacketCorruption)
+                    if (SimulatedPacketCorruption > 0 && random.NextDouble() < SimulatedPacketCorruption)
                     {
                         int shiftAmount = random.Next(length * BSUtility.BITS);
                         byte bitMask = (byte)(1 << (shiftAmount % BSUtility.BITS));

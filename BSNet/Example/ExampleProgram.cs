@@ -1,114 +1,14 @@
-﻿using BSNet.Stream;
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.Text;
 using System.Threading;
 
 namespace BSNet.Example
 {
     public class ExampleProgram
     {
-        public static void Main(string[] _)
+        public static void Main(string[] commands)
         {
-            // Testing on a header
-            //using (BSWriter writer = BSWriter.GetWriter(21))
-            //{
-            //    // Write header data
-            //    using (Header header = Header.GetHeader(ConnectionType.HEARTBEAT, 0,
-            //        0, 4214, 79832678))
-            //    {
-            //        header.Serialize(writer);
-            //    }
-
-            //    writer.SerializeUShort(0);
-
-            //    writer.PadToEnd();
-
-            //    // Write message data
-            //    writer.SerializeChecksum(new byte[] { 0x00, 0x00, 0x00, 0x01 });
-
-            //    byte[] rawBytes = writer.ToArray();
-            //}
-
-            //Console.ReadKey(true);
-
-
-            // Comparing different writers
-            //using (BSWriter writer = BSWriter.GetWriter(4))
-            //{
-            //    writer.SerializeUInt(15, 32);
-            //    writer.SerializeUInt(15, 16);
-            //    writer.SerializeUInt(15, 5);
-            //    writer.SerializeUInt(15, 9);
-            //    writer.SerializeChecksum(new byte[] { 0x00 });
-            //    Console.WriteLine("BSWriter");
-            //    foreach (var item in writer.ToArray())
-            //      Console.WriteLine(item);
-            //}
-
-            //OldWriter writer2 = OldWriter.GetWriter(4 * 2);
-            //writer2.SerializeUInt(15, 32);
-            //writer2.SerializeUInt(15, 16);
-            //writer2.SerializeUInt(15, 5);
-            //writer2.SerializeUInt(15, 9);
-            //Console.WriteLine("OldWriter");
-            //foreach (var item in writer2.ToArray())
-            //  Console.WriteLine(item);
-
-            //Console.ReadKey(true);
-
-
-            // Testing nested writers
-            //BSWriter occupy1 = BSWriter.Get(4);
-            //BSWriter occupy2 = BSWriter.Get(3);
-            //BSWriter occupy3 = BSWriter.Get(2);
-            //BSWriter.Return(occupy1);
-            //BSWriter.Return(occupy2);
-            //BSWriter.Return(occupy3);
-
-            //byte[] fullBytes;
-            //using (BSWriter writer1 = BSWriter.Get(1))
-            //{
-            //    writer1.SerializeUInt(1U, 1);
-            //    writer1.SerializeUInt(273U, 11);
-            //    writer1.SerializeUInt(273U, 17);
-            //    writer1.SerializeUInt(uint.MaxValue, 14);
-            //    writer1.SerializeUInt(511U, 9);
-            //    writer1.SerializeUInt(511U, 9);
-            //    writer1.SerializeUInt(511U, 9);
-            //    writer1.SerializeUInt(511U, 9);
-            //    writer1.SerializeUInt(511U, 9);
-            //    writer1.SerializeUInt(511U, 9);
-            //    byte[] rawBytes = writer1.ToArray();
-            //    BSUtility.PrintBits(rawBytes);
-
-            //    using (BSWriter writer2 = BSWriter.Get(2))
-            //    {
-            //        writer2.SerializeBytes(writer1.TotalBits, rawBytes, true);
-            //        BSUtility.PrintBits(writer2.ToArray());
-
-            //        fullBytes = writer2.ToArray();
-            //    }
-            //}
-
-            //using (BSReader reader = BSReader.Get(fullBytes))
-            //{
-            //    Console.WriteLine(reader.SerializeUInt(0, 1));
-            //    Console.WriteLine(reader.SerializeUInt(0, 11));
-            //    Console.WriteLine(reader.SerializeUInt(0, 17));
-            //    Console.WriteLine(reader.SerializeUInt(0, 14));
-            //    Console.WriteLine(reader.SerializeUInt(0, 9));
-            //    Console.WriteLine(reader.SerializeUInt(0, 9));
-            //    Console.WriteLine(reader.SerializeUInt(0, 9));
-            //    Console.WriteLine(reader.SerializeUInt(0, 9));
-            //    Console.WriteLine(reader.SerializeUInt(0, 9));
-            //    Console.WriteLine(reader.SerializeUInt(0, 9));
-            //}
-
-            //Console.ReadKey(true);
-
-
-            MainServer();
+            MainServer(commands);
         }
 
         private static void MainP2P()
@@ -142,32 +42,30 @@ namespace BSNet.Example
         }
 
         private static ExampleServer Server { get; set; }
+        private static List<ExampleClient> botClients = new List<ExampleClient>();
+        private static bool quitting = false;
 
-        private static void MainServer()
+        private static void StopServer()
+        {
+            Server.Dispose();
+
+            lock (botClients)
+            {
+                foreach (ExampleClient client in botClients)
+                    client.Dispose();
+                botClients.Clear();
+            }
+        }
+
+        private static void MainServer(string[] commands)
         {
             int serverPort = 1615;
             Server = new ExampleServer(serverPort);
-            List<ExampleClient> botClients = new List<ExampleClient>();
-
-            bool quit = false;
-
-            // Lambda for stopping the server
-            Action StopServer = new Action(() =>
-            {
-                Server.Dispose();
-
-                lock (botClients)
-                {
-                    foreach (ExampleClient client in botClients)
-                        client.Dispose();
-                    botClients.Clear();
-                }
-            });
 
             // Run the server + bots in another thread
             Thread thread = new Thread(() =>
             {
-                while (!quit)
+                while (!quitting)
                 {
                     Server.Update();
 
@@ -185,7 +83,7 @@ namespace BSNet.Example
             {
                 e.Cancel = true;
 
-                quit = true;
+                quitting = true;
 
                 // Dispose of server
                 StopServer();
@@ -193,62 +91,74 @@ namespace BSNet.Example
                 Environment.Exit(0);
             };
 
+            // Run initial commands
+            foreach (string command in commands)
+                HandleCommand(command);
+
             // Run commands
-            while (!quit)
+            while (!quitting)
             {
                 Console.Write("> ");
-                string msg = Console.ReadLine().ToLower();
-                string[] args = msg.Split(' ');
-                string command = args[0];
-                switch (command)
-                {
-                    case "cls":
-                        Console.Clear();
-                        break;
-                    case "pl":
-                        Server.PrintConnections(20);
-                        break;
-                    case "bot":
-                        AddBot(args, botClients);
-                        break;
-                    case "stats":
-                        Server.PrintNetworkStats();
-                        break;
-                    case "version":
-                        VersionCommands(args);
-                        break;
-                    case "hide":
-                        string logLevel = args[1];
-                        switch (logLevel)
-                        {
-                            case "info":
-
-                                break;
-                            case "warning":
-
-                                break;
-                            case "error":
-
-                                break;
-                        }
-                        break;
-                    case "show":
-
-                        break;
-                    case "exit":
-                        quit = true;
-                        break;
-                    case "restart":
-                        Restart(StopServer, botClients);
-                        break;
-                    default:
-                        Console.WriteLine($"Unknown command: {command}");
-                        break;
-                }
+                HandleCommand(Console.ReadLine());
             }
 
             // Dispose of server
             StopServer();
+        }
+
+        private static void HandleCommand(string line)
+        {
+            string msg = line.ToLower();
+            string[] args = msg.Split(' ');
+            string command = args[0];
+            switch (command)
+            {
+                case "cls":
+                    Console.Clear();
+                    break;
+                case "pl":
+                    PrintConnections(args);
+                    break;
+                case "bot":
+                    AddBots(args);
+                    break;
+                case "stats":
+                    Server.PrintNetworkStats();
+                    break;
+                case "version":
+                    VersionCommands(args);
+                    break;
+                case "simulate":
+                    SimulateNetwork(args);
+                    break;
+                case "hide":
+                    string logLevel = args[1];
+                    switch (logLevel)
+                    {
+                        case "info":
+
+                            break;
+                        case "warning":
+
+                            break;
+                        case "error":
+
+                            break;
+                    }
+                    break;
+                case "show":
+
+                    break;
+                case "exit":
+                    quitting = true;
+                    break;
+                case "restart":
+                    Restart(StopServer, botClients);
+                    break;
+                default:
+                    Console.WriteLine($"Unknown command: {command}");
+                    break;
+            }
         }
 
         private static void PrintBytes(byte[] bytes)
@@ -258,8 +168,8 @@ namespace BSNet.Example
             for (int i = 0; i < bytes.Length; i++)
             {
                 byte value = bytes[i];
-                char first = alphabet[(int)(value >> 4)];
-                char second = alphabet[(int)(value & 0xF)];
+                char first = alphabet[value >> 4];
+                char second = alphabet[value & 0xF];
 
                 Console.Write($"0x{first}{second}");
 
@@ -270,7 +180,16 @@ namespace BSNet.Example
             Console.Write("\r\n");
         }
 
-        private static void AddBot(string[] args, IList<ExampleClient> botClients)
+        private static void PrintConnections(string[] args)
+        {
+            int amount = 20;
+            if (args.Length > 1)
+                int.TryParse(args[1], out amount);
+
+            Server.PrintConnections(amount);
+        }
+
+        private static void AddBots(string[] args)
         {
             int amount = 1;
             if (args.Length > 1)
@@ -309,6 +228,35 @@ namespace BSNet.Example
                     Console.WriteLine($"Unknown command: {args[0]} {args[1]}");
                     break;
             }
+        }
+
+        private static void SimulateNetwork(string[] args)
+        {
+#if NETWORK_DEBUG
+            if (args.Length < 2) return;
+
+            double amount = 0;
+            if (args.Length > 2)
+                double.TryParse(args[2], out amount);
+
+            switch (args[1])
+            {
+                case "latency":
+                    Server.SimulatedPacketLatency = amount;
+                    break;
+                case "loss":
+                    Server.SimulatedPacketLoss = amount / 100d;
+                    break;
+                case "corruption":
+                    Server.SimulatedPacketCorruption = amount / 100d;
+                    break;
+                default:
+                    Console.WriteLine($"Unknown command: {args[0]} {args[1]}");
+                    break;
+            }
+#else
+            Console.WriteLine("Compile the program with NETWORK_DEBUG to use this feature");
+#endif
         }
 
         private static void Restart(Action StopServer, IList<ExampleClient> botClients)

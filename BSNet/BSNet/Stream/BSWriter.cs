@@ -18,6 +18,7 @@ namespace BSNet.Stream
 
         public bool Writing { get { return true; } }
         public bool Reading { get { return false; } }
+        public bool Corrupt { get; private set; } = false;
 
         public int TotalBits
         {
@@ -100,12 +101,15 @@ namespace BSNet.Stream
         {
             byte[] data = ToArray();
 
+            // Combine the data with version
             byte[] combinedBytes = BSPool.GetBuffer(version.Length + data.Length);
             Buffer.BlockCopy(version, 0, combinedBytes, 0, version.Length);
             Buffer.BlockCopy(data, 0, combinedBytes, version.Length, data.Length);
 
+            // Generate checksum of data + version
             byte[] crcBytes = Cryptography.CRC32Bytes(combinedBytes);
 
+            // Combine checksum with data
             byte[] headerBytes = BSPool.GetBuffer(crcBytes.Length + data.Length);
             Buffer.BlockCopy(crcBytes, 0, headerBytes, 0, crcBytes.Length);
             Buffer.BlockCopy(data, 0, headerBytes, crcBytes.Length, data.Length);

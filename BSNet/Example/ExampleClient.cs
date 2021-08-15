@@ -11,7 +11,7 @@ namespace BSNet.Example
 
         protected bool verbose = false;
 
-        public override byte[] ProtocolVersion => new byte[] { 0x00, 0x00, 0x00, 0x01 };
+        public override byte[] ProtocolVersion => new byte[] { 0xBE, 0xEB, 0xB0, 0x0B };
 
         public ExampleClient(int localPort, string peerIP, int peerPort, bool verbose = false) : base(localPort)
         {
@@ -24,11 +24,11 @@ namespace BSNet.Example
             // Send a request to connect
             Connect(peerEndPoint);
 
-#if NETWORK_DEBUG
+/*#if NETWORK_DEBUG
             SimulatedPacketLatency = 250; // 250ms
             SimulatedPacketLoss = 250; // 25%
             SimulatedPacketCorruption = 1; // 0.1%
-#endif
+#endif*/
         }
 
         // For error logging
@@ -63,7 +63,8 @@ namespace BSNet.Example
             //SendMessageReliable(endPoint, writer =>
             //{
             //    byte[] rawBytes = new byte[20];
-            //    Cryptography.GetBytes(rawBytes);
+            //    Random rand = new Random();
+            //    rand.NextBytes(rawBytes);
             //    writer.SerializeBytes(rawBytes);
             //});
 
@@ -96,20 +97,13 @@ namespace BSNet.Example
 
         protected override void OnReceiveAcknowledgement(ushort sequence)
         {
-            //if (verbose)
-            //    Log($"Packet {sequence} acknowledged", LogLevel.Info);
+            if (verbose)
+                Log($"Packet {sequence} acknowledged", LogLevel.Info);
         }
 
         protected override void OnNetworkStatistics(int outGoingBipS, int inComingBipS)
         {
-            if (verbose)
-            {
-                foreach (ClientConnection connection in connections.Values)
-                    Log($"{connection.AddressPoint} - {Math.Round(connection.RTT * 1000)}ms latency - {Math.Round(connection.PacketLoss * 100)}% packet loss", LogLevel.Info);
-
-                Log($"Outgoing bits in the last second: {outGoingBipS / 1000f} Kbits/S", LogLevel.Info);
-                Log($"Incoming bits in the last second: {inComingBipS / 1000f} Kbits/S", LogLevel.Info);
-            }
+            
         }
     }
 }
