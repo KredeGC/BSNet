@@ -34,6 +34,17 @@ namespace BSNet.Stream
         int PadToByte();
         #endregion
 
+        #region Bool
+        /// <summary>
+        /// Serializes a bool as a single bit
+        /// </summary>
+        /// <exception cref="System.ArgumentNullException"/>
+        /// <exception cref="System.ArgumentOutOfRangeException"/>
+        /// <param name="value">The bool to serialize</param>
+        /// <returns>The serialized bool</returns>
+        bool SerializeBool(bool value = default(bool));
+        #endregion
+
         #region Unsigned
         /// <summary>
         /// Serializes a byte, using the given bitCount

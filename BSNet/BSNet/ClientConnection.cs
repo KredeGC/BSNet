@@ -23,6 +23,12 @@ namespace BSNet
         public double PacketLoss { private set; get; }
 
         /// <summary>
+        /// The estimated packet corruption
+        /// <para/>Note: Uses an exponentially smoothed average
+        /// </summary>
+        public double PacketCorruption { private set; get; }
+
+        /// <summary>
         /// The sequence number of the last sent packet
         /// </summary>
         public ushort LocalSequence { private set; get; }
@@ -89,6 +95,15 @@ namespace BSNet
         }
 
         /// <summary>
+        /// Updates the packet corruption estimate
+        /// </summary>
+        /// <param name="corrupted">Whether this newly received packet was corrupted or not</param>
+        public void UpdateCorruption(bool corrupted)
+        {
+            PacketCorruption = PacketCorruption * 0.99d + (corrupted ? 0.01d : 0);
+        }
+
+        /// <summary>
         /// Increments the local sequence and updates the timer and estimated packet loss
         /// </summary>
         /// <param name="time">The current time</param>
@@ -146,7 +161,7 @@ namespace BSNet
         }
 
         /// <summary>
-        /// Update the client's Round-trip-time
+        /// Update the client's Round-trip-time estimate
         /// </summary>
         /// <param name="sequence">The sequence we have acknowledged</param>
         /// <param name="time">The current time, to compare</param>

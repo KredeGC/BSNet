@@ -12,7 +12,7 @@ using UnityEngine;
 
 namespace BSNet.Stream
 {
-    public class BSWriter : IBSStream, IDisposable
+    public sealed class BSWriter : IBSStream, IDisposable
     {
         private static Queue<BSWriter> writerPool = new Queue<BSWriter>();
 
@@ -48,7 +48,7 @@ namespace BSNet.Stream
             GC.SuppressFinalize(this);
         }
 
-        protected virtual void Dispose(bool disposing)
+        private void Dispose(bool disposing)
         {
             Return(this);
         }
@@ -142,6 +142,18 @@ namespace BSNet.Stream
             byte[] padding = new byte[1];
             SerializeBytes(remaining, padding);
             return remaining;
+        }
+        #endregion
+
+        #region Bool
+        /// <inheritdoc/>
+        public bool SerializeBool(bool value = default(bool))
+        {
+            byte[] bytes = BSPool.GetBuffer(1);
+            bytes[0] = (byte)(value ? 1 : 0);
+            Write(1, bytes);
+            BSPool.ReturnBuffer(bytes);
+            return value;
         }
         #endregion
 

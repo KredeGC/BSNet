@@ -12,7 +12,7 @@ using UnityEngine;
 
 namespace BSNet.Stream
 {
-    public class BSReader : IBSStream, IDisposable
+    public sealed class BSReader : IBSStream, IDisposable
     {
         private static Queue<BSReader> readerPool = new Queue<BSReader>();
 
@@ -49,7 +49,7 @@ namespace BSNet.Stream
             GC.SuppressFinalize(this);
         }
 
-        protected virtual void Dispose(bool disposing)
+        private void Dispose(bool disposing)
         {
             Return(this);
         }
@@ -130,16 +130,12 @@ namespace BSNet.Stream
             byte[] generatedBytes = Cryptography.CRC32Bytes(combinedBytes);
 
             // Compare the checksum
-            for (int i = 0; i < crcBytes.Length; i++)
+            if (!BSUtility.CompareBytes(crcBytes, generatedBytes))
             {
-                if (!crcBytes[i].Equals(generatedBytes[i]))
-                {
-                    BSPool.ReturnBuffer(data);
-                    BSPool.ReturnBuffer(crcBytes);
-                    BSPool.ReturnBuffer(combinedBytes);
-
-                    return false;
-                }
+                BSPool.ReturnBuffer(data);
+                BSPool.ReturnBuffer(crcBytes);
+                BSPool.ReturnBuffer(combinedBytes);
+                return false;
             }
 
             BSPool.ReturnBuffer(internalStream);
@@ -167,6 +163,16 @@ namespace BSNet.Stream
             int remaining = (8 - TotalBits % 8) % 8;
             SerializeBytes(remaining);
             return remaining;
+        }
+        #endregion
+
+        #region Bool
+        /// <inheritdoc/>
+        public bool SerializeBool(bool value = default(bool))
+        {
+            if (Corrupt) return false;
+            byte[] bytes = SerializeBytes(1);
+            return bytes[0] != 0;
         }
         #endregion
 

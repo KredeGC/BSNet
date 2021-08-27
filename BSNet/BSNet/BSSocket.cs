@@ -384,6 +384,9 @@ namespace BSNet
             {
                 if (!reader.SerializeChecksum(ProtocolVersion))
                 {
+                    if (connections.TryGetValue(endPoint, out ClientConnection connection))
+                        connection.UpdateCorruption(true);
+
                     Log($"Mismatching checksum received from {endPoint}. Possibly corrupted", LogLevel.Warning);
                     return;
                 }
@@ -420,12 +423,19 @@ namespace BSNet
                                 AddReliableMessage(connection, bytes);
                             }
 
+                            connection.UpdateCorruption(false);
+
                             // If this connection is not authenticated
                             if (!connection.Authenticated)
                             {
                                 connection.Authenticate(header.Token, ElapsedTime);
                                 OnConnect(endPoint);
                             }
+                        }
+                        else
+                        {
+                            if (connections.TryGetValue(endPoint, out ClientConnection connection))
+                                connection.UpdateCorruption(true);
                         }
                     }
                     else if (connections.TryGetValue(endPoint, out ClientConnection connection))
@@ -435,8 +445,14 @@ namespace BSNet
                             // If this connection is authenticated
                             if (connection.Authenticated && connection.Authenticate(header.Token, ElapsedTime))
                             {
+                                connection.UpdateCorruption(false);
+
                                 connections.Remove(endPoint);
                                 OnDisconnect(endPoint);
+                            }
+                            else
+                            {
+                                connection.UpdateCorruption(true);
                             }
                         }
                         else if (connection.Authenticated) // Only allow messages/heartbeats from authenticated connections
@@ -444,6 +460,8 @@ namespace BSNet
                             // Compare the tokens
                             if (connection.Authenticate(header.Token, ElapsedTime))
                             {
+                                connection.UpdateCorruption(false);
+
                                 // Remove acknowledged messages
                                 for (int i = 31; i >= 0; i--) // Shouldn't it be 32?
                                 {
@@ -471,6 +489,8 @@ namespace BSNet
                             }
                             else
                             {
+                                connection.UpdateCorruption(true);
+
                                 Log($"Mismatching token received from {endPoint}", LogLevel.Warning);
                             }
                         }
@@ -484,6 +504,8 @@ namespace BSNet
         /// </summary>
         protected virtual void ReceiveMessages()
         {
+            if (_disposing) return;
+
 #if NETWORK_DEBUG
             for (int i = latencyList.Count - 1; i >= 0; i--)
             {
@@ -497,7 +519,7 @@ namespace BSNet
             }
 #endif
 
-            while (!_disposing && socket.Available > 0)
+            while (socket.Available > 0)
             {
                 EndPoint endPoint = new IPEndPoint(IPAddress.Any, 0);
 

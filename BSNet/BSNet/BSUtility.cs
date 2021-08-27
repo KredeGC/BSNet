@@ -71,6 +71,25 @@ namespace BSNet
         }
 
         /// <summary>
+        /// Compares 2 byte arrays
+        /// </summary>
+        /// <param name="baseBytes">The first byte array to compare</param>
+        /// <param name="compareBytes">The byte array to compare against</param>
+        /// <returns>Whether the byte arrays are equal</returns>
+        public static bool CompareBytes(byte[] baseBytes, byte[] compareBytes)
+        {
+            if (baseBytes.Length != compareBytes.Length) return false;
+
+            for (int i = 0; i < baseBytes.Length; i++)
+            {
+                if (!baseBytes[i].Equals(compareBytes[i]))
+                    return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
         /// Return this machines local IPAddress, hopefully
         /// </summary>
         /// <returns></returns>

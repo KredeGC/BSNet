@@ -42,7 +42,7 @@ namespace BSNet.Example
             {
                 if (connection.Authenticated)
                 {
-                    Log($"{connection.AddressPoint} - {Math.Round(connection.RTT * 1000)}ms latency - {Math.Round(connection.PacketLoss * 100)}% packet loss", LogLevel.Info);
+                    Log($"{connection.AddressPoint} - {Math.Round(connection.RTT * 1000)}ms latency - {Math.Round(connection.PacketLoss * 100)}% packet loss - {Math.Round(connection.PacketCorruption * 100)}% packet corruption", LogLevel.Info);
                     counter++;
                     if (counter >= amount)
                         break;

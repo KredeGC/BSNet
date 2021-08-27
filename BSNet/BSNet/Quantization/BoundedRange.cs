@@ -75,6 +75,7 @@ namespace BSNet.Quantization {
 
 	public class BoundedRange {
         public int BitsRequired { get; }
+        public float Precision => precision;
 
         private readonly float minValue;
 		private readonly float maxValue;
