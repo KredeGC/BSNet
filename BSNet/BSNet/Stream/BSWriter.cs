@@ -355,12 +355,23 @@ namespace BSNet.Stream
 
         #region Bytes
         /// <inheritdoc/>
-        public byte[] SerializeBytes(int bitCount, byte[] data = null, bool trimRight = false)
+        public byte[] SerializeStream(int bitCount, byte[] data = null)
         {
-            int offset = trimRight ? data.Length * BSUtility.BITS - bitCount : 0;
+            int offset = data.Length * BSUtility.BITS - bitCount;
             byte[] raw = BSPool.GetBuffer(data.Length);
             Buffer.BlockCopy(data, 0, raw, 0, data.Length);
             Write(bitCount, raw, offset);
+            BSPool.ReturnBuffer(raw);
+            return raw;
+        }
+
+        /// <inheritdoc/>
+        public byte[] SerializeBytes(int bitCount, byte[] data = null)
+        {
+            int length = (bitCount - 1) / BSUtility.BITS + 1;
+            byte[] raw = BSPool.GetBuffer(length);
+            Buffer.BlockCopy(data, 0, raw, 0, length);
+            Write(bitCount, raw);
             BSPool.ReturnBuffer(raw);
             return raw;
         }

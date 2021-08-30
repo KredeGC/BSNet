@@ -1,4 +1,6 @@
-﻿using BSNet.Stream;
+﻿using BSNet;
+using BSNet.Quantization;
+using BSNet.Stream;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace BSNetTest
@@ -10,7 +12,7 @@ namespace BSNetTest
 
         /// <summary>
         /// Test the ability to retrieve a writer
-        /// <para>Fails if the 2 writers refer to the same object</para>
+        /// <para/>Fails if the 2 writers refer to the same object
         /// </summary>
         [TestMethod]
         public void WriterPoolTest()
@@ -26,7 +28,7 @@ namespace BSNetTest
 
         /// <summary>
         /// Test the ability to retrieve a reader
-        /// <para>Fails if the 2 readers refer to the same object</para>
+        /// <para/>Fails if the 2 readers refer to the same object
         /// </summary>
         [TestMethod]
         public void ReaderPoolTest()
@@ -60,7 +62,7 @@ namespace BSNetTest
                 using (BSWriter writer2 = BSWriter.Get())
                 {
                     // Take that byte array and write it directly int a new writer
-                    writer2.SerializeBytes(writer1.TotalBits, writer1Bytes, true);
+                    writer2.SerializeStream(writer1.TotalBits, writer1Bytes);
 
                     byte[] writer2Bytes = writer2.ToArray();
 
@@ -74,8 +76,44 @@ namespace BSNetTest
         }
 
         /// <summary>
-        /// Test the ability to read and write bits
-        /// <para>Fails if the input doesn't match the output</para>
+        /// Test the ability to read serialized data from one reader to another
+        /// <para/>Fails if the serialized data doesn't match
+        /// </summary>
+        [TestMethod]
+        public void NestedReaderTest()
+        {
+            BoundedRange range = new BoundedRange(0, 10, 0.0001f);
+            byte[] rawBytes;
+            using (BSWriter writer = BSWriter.Get())
+            {
+                // Write some non byte-aligned values
+                writer.SerializeUInt(904, 10);
+                writer.SerializeFloat(range, 7.123f);
+
+                rawBytes = writer.ToArray();
+            }
+
+            byte[] inlineBytes;
+            using (BSReader reader = BSReader.Get(rawBytes))
+            {
+                // Read the first value
+                Assert.AreEqual(904U, reader.SerializeUInt(0, 10));
+
+                // Read the second value as a byte array
+                inlineBytes = reader.SerializeStream(reader.TotalBits);
+            }
+            
+            using (BSReader reader = BSReader.Get(inlineBytes))
+            {
+                // Read the second value from the byte array
+                float quantizedFloat = range.Dequantize(range.Quantize(7.123f)); // Quantize float
+                Assert.AreEqual(quantizedFloat, reader.SerializeFloat(range));
+            }
+        }
+
+        /// <summary>
+        /// Test the ability to read and write bits precisely
+        /// <para/>Fails if the input doesn't match the output
         /// </summary>
         [TestMethod]
         public void PrecisionReadWriteTest()
@@ -109,7 +147,7 @@ namespace BSNetTest
 
         /// <summary>
         /// Test whether writing data with overflow produces the correct results
-        /// <para>Fails if the input doesn't match the output</para>
+        /// <para/>Fails if the input doesn't match the output
         /// </summary>
         [TestMethod]
         public void OverflowReadWriteTest()
@@ -137,7 +175,7 @@ namespace BSNetTest
 
         /// <summary>
         /// Test a range of unsigned integers and compare size and content
-        /// <para>Fails if the size of the array doesn't match or the given integers don't match</para>
+        /// <para/>Fails if the size of the array doesn't match or the given integers don't match
         /// </summary>
         [TestMethod]
         public void UIntRangeReadWriteTest()
@@ -163,7 +201,7 @@ namespace BSNetTest
                 Assert.AreEqual(expectedBitSize, writer.TotalBits);
                 Assert.AreEqual(expectedByteSize, rawBytes.Length);
             }
-            
+
             using (BSReader reader = BSReader.Get(rawBytes))
             {
                 uint value = 1;

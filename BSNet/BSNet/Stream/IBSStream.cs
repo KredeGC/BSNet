@@ -226,13 +226,14 @@ namespace BSNet.Stream
 
         #region Bytes
         /// <summary>
-        /// Serializes an array of bytes
+        /// Serializes a given amount from an array of bytes, and shifts everything to be byte-aligned
         /// </summary>
         /// <exception cref="System.ArgumentNullException"/>
         /// <exception cref="System.ArgumentOutOfRangeException"/>
+        /// <param name="bitCount">The amount of bits to serialize, from little-endian</param>
         /// <param name="bytes">The byte array to serialize</param>
         /// <returns>The serialized byte array</returns>
-        byte[] SerializeBytes(byte[] bytes = null);
+        byte[] SerializeStream(int bitCount, byte[] bytes = null);
 
         /// <summary>
         /// Serializes a given amount from an array of bytes
@@ -243,7 +244,16 @@ namespace BSNet.Stream
         /// <param name="bytes">The byte array to serialize</param>
         /// <param name="trimRight">Whether to shift everything to the right, if the bytes don't match</param>
         /// <returns>The serialized byte array</returns>
-        byte[] SerializeBytes(int bitCount, byte[] bytes = null, bool trimRight = false);
+        byte[] SerializeBytes(int bitCount, byte[] bytes = null);
+
+        /// <summary>
+        /// Serializes an array of bytes
+        /// </summary>
+        /// <exception cref="System.ArgumentNullException"/>
+        /// <exception cref="System.ArgumentOutOfRangeException"/>
+        /// <param name="bytes">The byte array to serialize</param>
+        /// <returns>The serialized byte array</returns>
+        byte[] SerializeBytes(byte[] bytes = null);
         #endregion
     }
 }

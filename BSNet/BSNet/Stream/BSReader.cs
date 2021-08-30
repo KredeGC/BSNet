@@ -374,7 +374,14 @@ namespace BSNet.Stream
 
         #region Bytes
         /// <inheritdoc/>
-        public byte[] SerializeBytes(int bitCount, byte[] data = null, bool trimRight = false)
+        public byte[] SerializeStream(int bitCount, byte[] data = null)
+        {
+            int offset = (BSUtility.BITS - bitCount % BSUtility.BITS) % BSUtility.BITS;
+            return Read(bitCount, offset);
+        }
+
+        /// <inheritdoc/>
+        public byte[] SerializeBytes(int bitCount, byte[] data = null)
         {
             return Read(bitCount);
         }
@@ -387,7 +394,7 @@ namespace BSNet.Stream
         #endregion
 
         // Read internally
-        private byte[] Read(int bitCount)
+        private byte[] Read(int bitCount, int offset = 0)
         {
             if (bitCount == 0) return new byte[0];
 
@@ -405,7 +412,7 @@ namespace BSNet.Stream
             byte[] data = new byte[length];
 
             // The offset to shift by
-            int offset = (BSUtility.BITS - bitCount % BSUtility.BITS) % BSUtility.BITS;
+            int totalOffset = (BSUtility.BITS - (bitCount + offset) % BSUtility.BITS) % BSUtility.BITS;
             int leftShift = (bitPos - 1) % BSUtility.BITS;
             int rightShift = BSUtility.BITS - leftShift;
             byte leftValue = 0;
@@ -420,16 +427,16 @@ namespace BSNet.Stream
                 if (bytePos + i + 1 < internalStream.Length)
                     value |= (byte)(internalStream[bytePos + i + 1] >> rightShift);
 
-                if (offset > 0)
+                if (totalOffset > 0)
                 {
                     byte original = value;
 
                     // Shift to the right to correct the data
-                    value = (byte)(value >> offset);
+                    value = (byte)(value >> totalOffset);
 
                     // Shift part of the value on the left into this value
                     if (bytePos + i - 1 >= 0)
-                        value |= (byte)(leftValue << BSUtility.BITS - offset);
+                        value |= (byte)(leftValue << BSUtility.BITS - totalOffset);
 
                     leftValue = original;
                 }
