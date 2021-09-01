@@ -7,13 +7,13 @@ Should NOT be used with sensitive data as no encryption occurs, whatsoever.
 * Connection-based, built on top of UDP with keep-alive packets.
 * Supports both reliable and unreliable packets over UDP.
 * Reliability layer with acknowledgements redundantly sent in every packet.
-* 20 bytes (and 3 bits) of packet overhead.
-* CRC32 to protect against old clients and accidental connections.
+* 20 bytes (and 2 bits) of packet overhead.
+* CRC32 checksum to protect against old clients and accidental connections.
 * Bitpacking mostly based on [BitPackerTools](https://github.com/LazyBui/BitPackerTools), with some improvements.
 * Quantization of floats, Vectors and Quaternions, from [NetStack](https://github.com/nxrighthere/NetStack).
 * Made for .NET Framework 4.6.1 and Unity.
 
-### What this protects against
+### Protects against casual attacks like
 * IP spoofing (A challenge packet is sent when connections are requested).
 * Replay attacks (All packets have unique sequence numbers, and can't be used multiple times).
 * DDoS amplification (Connection packets enforce padding in messages).
@@ -21,26 +21,29 @@ Should NOT be used with sensitive data as no encryption occurs, whatsoever.
 
 ### What this doesn't protect against
 * Man in the middle attacks (Proper encryption would be needed for that).
-* Zombie clients.
+* Zombie clients (A more sophisticated detection system would be required).
 
 ### Future ideas
 * Some sort of packet fragmentation and reassembly.
 * Make SendMessageUnreliable and SendMessageReliable buffer instead of sending straight away.
   * On each tick: Combine the buffered messages into one, preferring the reliable buffer.
-  * In regards to the reliable buffer: Don't remove packets from the buffer until it has been acknowledged.
+  * Don't remove packets from the reliable buffer until it has been acknowledged.
   * Possibly use the aforementioned fragmentation, if the packets are too big.
 
 # Usage
 ## P2P example
-This is an example of a simple P2P architecture, where both ends connect to eachother and send a message when connected.
+This is an example of a simple P2P architecture, where both ends connect to eachother and send a message with the connection packet.
 ```csharp
-public class Client : BSSocket
+using BSNet.Stream;
+using System;
+using System.Net;
+using System.Text;
+
+public class P2PExample : BSSocket
 {
-    public override byte[] ProtocolVersion => new byte[] { 0x00, 0x00, 0x00, 0x01 };
-    
-    protected Encoding encoding = new ASCIIEncoding();
-    
-    public Client(int localPort, string peerIP, int peerPort) : base(localPort)
+    public override byte[] ProtocolVersion => new byte[] { 0xC0, 0xDE, 0xDE, 0xAD };
+
+    public P2PExample(int localPort, string peerIP, int peerPort) : base(localPort)
     {
         // Construct peer endpoint
         IPAddress peerAddress = IPAddress.Parse(peerIP);
@@ -50,43 +53,46 @@ public class Client : BSSocket
         Connect(peerEndPoint);
     }
 
-    // For error logging
+    // For logging
     protected override void Log(object obj, LogLevel level)
     {
         Console.WriteLine(obj);
     }
 
+    // Called when an endPoint wishes to connect, or we wish to connect to them
+    protected override void OnRequestConnect(IPEndPoint endPoint, IBSStream writer)
+    {
+        writer.SerializeString(Encoding.ASCII, $"Hello from {Port}!");
+    }
+
     // Called when a connection has been established with this IPEndPoint
-    protected override void OnConnect(IPEndPoint endPoint)
+    protected override void OnConnect(IPEndPoint endPoint, IBSStream reader)
     {
         Log($"{endPoint.ToString()} connected", LogLevel.Info);
 
-        // Send a message to the connected IPEndPoint
-        SendMessageReliable(endPoint, writer =>
-        {
-            writer.SerializeString(encoding, "Hello network!");
-        });
+        Log($"Received initial message: \"{reader.SerializeString(Encoding.ASCII)}\"", LogLevel.Info);
     }
-	
+
     // Called when a connection has been lost with this IPEndPoint
-    protected override void OnDisconnect(IPEndPoint endPoint)
+    protected override void OnDisconnect(IPEndPoint endPoint, IBSStream reader)
     {
         Log($"{endPoint.ToString()} disconnected", LogLevel.Info);
+
+        // Attempt to reconnect
+        Connect(endPoint);
     }
-	
+
     // Called when we receive a message from this IPEndPoint
-    protected override void OnReceiveMessage(IPEndPoint endPoint, ushort sequence, IBSStream reader)
-    {
-        // Receive the message, "Hello network!", from the other end
-        string message = reader.SerializeString(encoding);
-        Log(message, LogLevel.Info);
-    }
+    protected override void OnReceiveMessage(IPEndPoint endPoint, ushort sequence, IBSStream reader) { }
+
+    // Called when we receive an acknowledgement for a packet from this IPEndPoint
+    protected override void OnReceiveAcknowledgement(IPEndPoint endPoint, ushort sequence) { }
 }
 ```
 
 ## Bitpacking
 The readers and writers have built-in functionality for packing bits as tight as you want.
-They can also quantize floats, halfs, Vectors and Quaternions, to keep the bits low.
+They can also quantize floats, halves, Vectors and Quaternions, to keep the bits low.
 They can also encode strings using different TextEncodings, like ASCII or UTF-8.
 ```csharp
 // Create a new BoundedRange, with a minimum value of 0, a maximum of 1 and 0.01 in precision

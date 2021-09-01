@@ -8,7 +8,7 @@ namespace BSNet
         private static RNGCryptoServiceProvider rng = new RNGCryptoServiceProvider();
 
         private static readonly uint[] ChecksumTable;
-        private static readonly uint Polynomial = 0xEDB88320;
+        private const uint POLYNOMIAL = 0xEDB88320;
 
         static Cryptography()
         {
@@ -19,7 +19,7 @@ namespace BSNet
             {
                 uint item = index;
                 for (int bit = 0; bit < 8; ++bit)
-                    item = ((item & 1) != 0) ? (Polynomial ^ (item >> 1)) : (item >> 1);
+                    item = ((item & 1) != 0) ? (POLYNOMIAL ^ (item >> 1)) : (item >> 1);
                 ChecksumTable[index] = item;
             }
         }

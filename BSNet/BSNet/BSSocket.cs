@@ -5,11 +5,11 @@ using System.Net;
 using System.Net.Sockets;
 using BSNet.Stream;
 using BSNet.Datagram;
-
 #if (ENABLE_MONO || ENABLE_IL2CPP)
 using UnityEngine;
 #else
 using System.Diagnostics;
+
 #endif
 
 namespace BSNet
@@ -20,58 +20,62 @@ namespace BSNet
         /// The elapsed time since the socket was created
         /// </summary>
 #if !(ENABLE_MONO || ENABLE_IL2CPP)
-        public virtual double ElapsedTime => stopwatch.Elapsed.TotalSeconds;
-        protected Stopwatch stopwatch;
+        public double ElapsedTime => stopwatch.Elapsed.TotalSeconds;
+
+        protected readonly Stopwatch stopwatch;
 #else
-        public virtual double ElapsedTime { get; private set; }
+        public double ElapsedTime { get; private set; }
 #endif
 
         // Properties
+        /// <summary>
+        /// The version number for this connection
+        /// </summary>
         public abstract byte[] ProtocolVersion { get; }
 
         /// <summary>
         /// The receiving tickrate of this socket
         /// </summary>
-        public virtual double TickRate { protected set; get; }
+        public double TickRate { protected set; get; }
 
         /// <summary>
         /// The port this socket listens on and sends from
         /// </summary>
-        public virtual int Port => ((IPEndPoint)socket.LocalEndPoint).Port;
+        public int Port => ((IPEndPoint)socket.LocalEndPoint).Port;
 
         /// <summary>
         /// The endPoint this socket listens on and sends from
         /// </summary>
-        public virtual IPEndPoint LocalEndPoint => (IPEndPoint)socket.LocalEndPoint;
+        public IPEndPoint LocalEndPoint => (IPEndPoint)socket.LocalEndPoint;
 
 #if NETWORK_DEBUG
         // Network debugging
-        public virtual double SimulatedPacketLoss { set; get; } // 0-1000
         public virtual double SimulatedPacketLatency { set; get; } // 0-1000
-        public virtual double SimulatedPacketCorruption { set; get; } // 0-1000
+        public virtual double SimulatedPacketLoss { set; get; } // 0-1
+        public virtual double SimulatedPacketCorruption { set; get; } // 0-1
 
-        protected System.Random random = new System.Random();
+        protected readonly System.Random random = new System.Random();
 
-        protected List<Packet> latencyList = new List<Packet>();
+        protected readonly List<Packet> latencyList = new List<Packet>();
 #endif
 
         // Socket stuff
         protected double nextMessage;
-        protected IPEndPoint localEndPoint;
+        protected readonly IPEndPoint localEndPoint;
         protected Socket socket;
-        protected const int SIO_UDP_CONNRESET = -1744830452;
         protected bool _disposing;
+        protected const int SIO_UDP_CONNRESET = -1744830452;
 
         // Network statistics
         protected double nextBip;
-        protected int inComingBipS = 0;
-        protected int outGoingBipS = 0;
+        protected int inComingBipS;
+        protected int outGoingBipS;
 
         // Connections & reliable messages
-        protected Dictionary<IPEndPoint, ClientConnection> connections = new Dictionary<IPEndPoint, ClientConnection>();
-        protected Dictionary<ConnectionSequence, Packet> unsentMessages = new Dictionary<ConnectionSequence, Packet>();
-        protected List<IPEndPoint> lastTimedOut = new List<IPEndPoint>();
-        protected List<IPEndPoint> lastHeartBeats = new List<IPEndPoint>();
+        protected readonly Dictionary<IPEndPoint, ClientConnection> connections = new Dictionary<IPEndPoint, ClientConnection>();
+        protected readonly Dictionary<ConnectionSequence, Packet> unsentMessages = new Dictionary<ConnectionSequence, Packet>();
+        protected readonly List<IPEndPoint> lastTimedOut = new List<IPEndPoint>();
+        protected readonly List<IPEndPoint> lastHeartBeats = new List<IPEndPoint>();
 
         protected BSSocket(int port, int ticksPerSecond = 50)
         {
@@ -83,9 +87,12 @@ namespace BSNet
             try // This won't work on Linux
             {
                 // Disable ICMP exceptions
-                socket.IOControl(SIO_UDP_CONNRESET, new byte[] { 0, 0, 0, 0 }, null);
+                socket.IOControl(SIO_UDP_CONNRESET, new byte[] {0, 0, 0, 0}, null);
             }
-            catch { }
+            catch
+            {
+                // ignored
+            }
 
             socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
             socket.Bind(localEndPoint);
@@ -117,19 +124,18 @@ namespace BSNet
         /// <param name="disposing">Whether to disconnect gracefully</param>
         protected virtual void Dispose(bool disposing)
         {
-            if (!_disposing)
+            if (_disposing) return;
+
+            _disposing = true;
+
+            if (disposing)
             {
-                _disposing = true;
-
-                if (disposing)
-                {
-                    foreach (IPEndPoint endPoint in connections.Keys)
-                        Disconnect(endPoint);
-                }
-
-                socket.Close();
-                socket = null;
+                foreach (IPEndPoint endPoint in connections.Keys)
+                    Disconnect(endPoint);
             }
+
+            socket.Close();
+            socket = null;
         }
 
         /// <summary>
@@ -223,10 +229,7 @@ namespace BSNet
             // Check if authenticated
             if (connections.TryGetValue(endPoint, out ClientConnection connection) && connection.Authenticated)
             {
-                SendRawMessage(connection, ConnectionType.MESSAGE, connection.Token, writer =>
-                {
-                    action?.Invoke(writer);
-                });
+                SendRawMessage(connection, ConnectionType.MESSAGE, connection.Token, writer => action?.Invoke(writer));
 
                 return connection.LocalSequence;
             }
@@ -263,10 +266,7 @@ namespace BSNet
             // Check if authenticated
             if (connections.TryGetValue(endPoint, out ClientConnection connection) && connection.Authenticated)
             {
-                byte[] rawBytes = SendRawMessage(connection, ConnectionType.MESSAGE, connection.Token, writer =>
-                {
-                    action?.Invoke(writer);
-                });
+                byte[] rawBytes = SendRawMessage(connection, ConnectionType.MESSAGE, connection.Token, writer => action?.Invoke(writer));
 
                 // Add message to backlog
                 AddReliableMessage(connection, rawBytes);
@@ -328,7 +328,7 @@ namespace BSNet
             }
 
             if (rawBytes.Length > BSUtility.PACKET_MAX_SIZE)
-                throw new ArgumentOutOfRangeException("Packet size too big");
+                throw new OverflowException("Packet size too big");
 
             outGoingBipS += rawBytes.Length * 8;
 
@@ -485,7 +485,8 @@ namespace BSNet
                                             Packet.ReturnPacket(packet);
                                             unsentMessages.Remove(conSeq);
                                         }
-                                        if (!connection.HasReceivedAcknowledgement(seq, TickRate))
+
+                                        if (!connection.HasReceivedAcknowledgement(seq))
                                             OnReceiveAcknowledgement(endPoint, seq); // Return acknowledgement to application
                                     }
                                 }
@@ -625,10 +626,7 @@ namespace BSNet
                             unsentMessages.Remove(data.Key);
 
                             // Send new message
-                            byte[] newBytes = SendRawMessage(connection, header.Type, header.Token, writer =>
-                            {
-                                writer.SerializeBytes(bits, payload);
-                            });
+                            byte[] newBytes = SendRawMessage(connection, header.Type, header.Token, writer => writer.SerializeBytes(bits, payload));
 
                             // Add message to backlog
                             AddReliableMessage(connection, newBytes);
@@ -672,7 +670,9 @@ namespace BSNet
         /// </summary>
         /// <param name="outGoingBipS">The outgoing bits received in the last second</param>
         /// <param name="inComingBipS">The incoming bits received in the last second</param>
-        protected virtual void OnNetworkStatistics(int outGoingBipS, int inComingBipS) { }
+        protected virtual void OnNetworkStatistics(int outGoingBipS, int inComingBipS)
+        {
+        }
 
         /// <summary>
         /// Called when an event happens in the socket, such as warnings and errors
@@ -686,6 +686,7 @@ namespace BSNet
         /// <summary>
         /// Called when this socket receives an acknowledgement for a previously sent message, with the given sequence number
         /// </summary>
+        /// <param name="endPoint">The address of the endPoint which acknowledged the message</param>
         /// <param name="sequence">The sequence number that was acknowledged</param>
         protected abstract void OnReceiveAcknowledgement(IPEndPoint endPoint, ushort sequence);
 
@@ -694,7 +695,9 @@ namespace BSNet
         /// </summary>
         /// <param name="endPoint">The address of the endPoint which wants to establish connection</param>
         /// <param name="writer">The stream used to write a response message</param>
-        protected virtual void OnRequestConnect(IPEndPoint endPoint, IBSStream writer) { }
+        protected virtual void OnRequestConnect(IPEndPoint endPoint, IBSStream writer)
+        {
+        }
 
         /// <summary>
         /// Called when a connection is successfully established with a remote endPoint

@@ -4,8 +4,8 @@ namespace BSNet.Datagram
 {
     public struct ConnectionSequence
     {
-        public IPEndPoint EndPoint { private set; get; }
-        public ushort Sequence { private set; get; }
+        public IPEndPoint EndPoint { get; }
+        public ushort Sequence { get; }
 
         public ConnectionSequence(IPEndPoint endPoint, ushort sequence)
         {

@@ -1,27 +1,4 @@
-﻿/* 
- * The MIT License(MIT)
- * 
- * Copyright(c) 2015-2017 Bui
- * 
- * Permission is hereby granted, free of charge, to any person obtaining a copy of
- * this software and associated documentation files (the "Software"), to deal in
- * the Software without restriction, including without limitation the rights to
- * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
- * the Software, and to permit persons to whom the Software is furnished to do so,
- * subject to the following conditions:
- * 
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- * 
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
- * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
- * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
- * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
- * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- */
-
-using BSNet.Datagram;
+﻿using BSNet.Datagram;
 using System;
 using System.Linq;
 using System.Net;
@@ -41,34 +18,6 @@ namespace BSNet
             sizeof(uint) + // CRC32 of version + packet (4 bytes)
             Header.HEADER_SIZE; // Header
         public const int PACKET_MAX_SIZE = 1024; // 1472
-
-        private static readonly byte[] sBitMasks;
-
-        static BSUtility()
-        {
-            // Bit 0 isn't used
-            int maskCount = BITS + 1;
-            sBitMasks = new byte[maskCount];
-
-            for (int i = 1; i < maskCount; i++)
-            {
-                byte bitMask = 0;
-                int bitCount = 0;
-                for (byte j = 1; bitCount < i; j <<= 1, bitCount++)
-                    bitMask |= j;
-                sBitMasks[i] = bitMask;
-            }
-        }
-
-        public static byte GetNarrowingMask(int bitCount) => sBitMasks[bitCount];
-
-        public static byte GetWideningMask(int bitCount, int startBit)
-        {
-            byte bitMask = sBitMasks[bitCount];
-            bitMask <<= (BITS - bitCount);
-            bitMask >>= startBit;
-            return bitMask;
-        }
 
         /// <summary>
         /// Compares 2 byte arrays
@@ -111,6 +60,15 @@ namespace BSNet
                 }
             }
             return null;
+            
+            // return (from networkInterface in NetworkInterface.GetAllNetworkInterfaces()
+            //     where networkInterface.OperationalStatus == OperationalStatus.Up
+            //     select networkInterface.GetIPProperties()
+            //     into adapterProperties
+            //     where adapterProperties.GatewayAddresses.FirstOrDefault() != null
+            //     from ip in adapterProperties.UnicastAddresses
+            //     where ip.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork
+            //     select ip.Address).FirstOrDefault();
         }
 
         /// <summary>

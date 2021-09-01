@@ -10,11 +10,31 @@ using UnityEngine;
 
 namespace BSNet.Stream
 {
+    /// <summary>
+    /// A stream of bytes that can be read or written to, based on the appropriate flags
+    /// <para/>Includes methods to pack bits tightly
+    /// </summary>
     public interface IBSStream
     {
+        /// <summary>
+        /// Whether this stream is writing
+        /// </summary>
         bool Writing { get; }
+        
+        /// <summary>
+        /// Whether this stream is reading
+        /// </summary>
         bool Reading { get; }
+        
+        /// <summary>
+        /// The total amount of bits read / written
+        /// </summary>
         int TotalBits { get; }
+        
+        /// <summary>
+        /// Whether this stream has been corrupted while writing / reading
+        /// </summary>
+        bool Corrupt { get; }
 
         #region Padding
         /// <summary>
@@ -228,6 +248,7 @@ namespace BSNet.Stream
         /// <summary>
         /// Serializes a given amount from an array of bytes, and shifts everything to be byte-aligned
         /// </summary>
+        /// <exception cref="System.NullReferenceException"/>
         /// <exception cref="System.ArgumentNullException"/>
         /// <exception cref="System.ArgumentOutOfRangeException"/>
         /// <param name="bitCount">The amount of bits to serialize, from little-endian</param>
@@ -238,17 +259,18 @@ namespace BSNet.Stream
         /// <summary>
         /// Serializes a given amount from an array of bytes
         /// </summary>
+        /// <exception cref="System.NullReferenceException"/>
         /// <exception cref="System.ArgumentNullException"/>
         /// <exception cref="System.ArgumentOutOfRangeException"/>
         /// <param name="bitCount">The amount of bits to serialize, from little-endian</param>
         /// <param name="bytes">The byte array to serialize</param>
-        /// <param name="trimRight">Whether to shift everything to the right, if the bytes don't match</param>
         /// <returns>The serialized byte array</returns>
         byte[] SerializeBytes(int bitCount, byte[] bytes = null);
 
         /// <summary>
         /// Serializes an array of bytes
         /// </summary>
+        /// <exception cref="System.NullReferenceException"/>
         /// <exception cref="System.ArgumentNullException"/>
         /// <exception cref="System.ArgumentOutOfRangeException"/>
         /// <param name="bytes">The byte array to serialize</param>

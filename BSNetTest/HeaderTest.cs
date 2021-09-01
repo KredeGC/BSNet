@@ -33,20 +33,20 @@ namespace BSNetTest
                 rawBytes = writer.ToArray();
             }
 
-            Assert.AreEqual(rawBytes.Length, Header.HEADER_SIZE + 4);
+            Assert.AreEqual(Header.HEADER_SIZE + 4, rawBytes.Length);
 
             using (BSReader reader = BSReader.Get(rawBytes))
             {
                 using (Header header = Header.GetHeader(reader))
                 {
-                    Assert.AreEqual(header.Type, type);
-                    Assert.AreEqual(header.Sequence, sequence);
-                    Assert.AreEqual(header.Ack, ack);
-                    Assert.AreEqual(header.AckBits, ackBits);
-                    Assert.AreEqual(header.Token, token);
+                    Assert.AreEqual(type, header.Type);
+                    Assert.AreEqual(sequence, header.Sequence);
+                    Assert.AreEqual(ack, header.Ack);
+                    Assert.AreEqual(ackBits, header.AckBits, ackBits);
+                    Assert.AreEqual(token, header.Token);
                 }
 
-                Assert.AreEqual(reader.SerializeUInt(), randomValue);
+                Assert.AreEqual(randomValue, reader.SerializeUInt());
             }
         }
 
@@ -57,7 +57,7 @@ namespace BSNetTest
             byte type = ConnectionType.CONNECT;
             ushort sequence = 416;
             ushort ack = 412;
-            ushort ackBits = 4214;
+            uint ackBits = 0b0011001100110011;
             ulong token = 0xC0DECAFEBEEBB00B;
 
             byte[] rawBytes;
@@ -75,7 +75,7 @@ namespace BSNetTest
                 rawBytes = writer.ToArray();
             }
 
-            Assert.AreEqual(rawBytes.Length, BSUtility.PACKET_MAX_SIZE);
+            Assert.AreEqual(BSUtility.PACKET_MAX_SIZE, rawBytes.Length);
 
             using (BSReader reader = BSReader.Get(rawBytes))
             {
@@ -83,11 +83,11 @@ namespace BSNetTest
 
                 using (Header header = Header.GetHeader(reader))
                 {
-                    Assert.AreEqual(header.Type, type);
-                    Assert.AreEqual(header.Sequence, sequence);
-                    Assert.AreEqual(header.Ack, ack);
-                    Assert.AreEqual(header.AckBits, ackBits);
-                    Assert.AreEqual(header.Token, token);
+                    Assert.AreEqual(type, header.Type);
+                    Assert.AreEqual(sequence, header.Sequence);
+                    Assert.AreEqual(ack, header.Ack);
+                    Assert.AreEqual(ackBits, header.AckBits, ackBits);
+                    Assert.AreEqual(token, header.Token);
                 }
             }
         }

@@ -3,30 +3,31 @@ using System.Collections.Generic;
 using System.Net;
 using System.Text;
 using BSNet.Quantization;
-
 #if !(ENABLE_MONO || ENABLE_IL2CPP)
 using System.Numerics;
+
 #else
 using UnityEngine;
 #endif
 
 namespace BSNet.Stream
 {
+    /// <inheritdoc cref="BSNet.Stream.IBSStream" />
     public sealed class BSWriter : IBSStream, IDisposable
     {
-        private static Queue<BSWriter> writerPool = new Queue<BSWriter>();
+        private static readonly Queue<BSWriter> writerPool = new Queue<BSWriter>();
 
-        public bool Writing { get { return true; } }
-        public bool Reading { get { return false; } }
-        public bool Corrupt { get; private set; } = false;
-
-        public int TotalBits
-        {
-            get
-            {
-                return BSUtility.BITS * bytePos + bitPos - 1;
-            }
-        }
+        /// <inheritdoc/>
+        public bool Writing => true;
+        
+        /// <inheritdoc/>
+        public bool Reading => false;
+        
+        /// <inheritdoc/>
+        public bool Corrupt { get; private set; }
+        
+        /// <inheritdoc/>
+        public int TotalBits => BSUtility.BITS * bytePos + bitPos - 1;
 
         private byte[] internalStream;
         private int bytePos = 0;
@@ -90,6 +91,7 @@ namespace BSNet.Stream
                 {
                     writer.bytePos = 0;
                     writer.bitPos = 1;
+                    writer.Corrupt = false;
                     writerPool.Enqueue(writer);
                 }
             }
@@ -126,6 +128,7 @@ namespace BSNet.Stream
         }
 
         #region Padding
+
         /// <inheritdoc/>
         public int PadToEnd()
         {
@@ -143,9 +146,11 @@ namespace BSNet.Stream
             SerializeBytes(remaining, padding);
             return remaining;
         }
+
         #endregion
 
         #region Bool
+
         /// <inheritdoc/>
         public bool SerializeBool(bool value = default(bool))
         {
@@ -155,9 +160,11 @@ namespace BSNet.Stream
             BSPool.ReturnBuffer(bytes);
             return value;
         }
+
         #endregion
 
         #region Unsigned
+
         /// <inheritdoc/>
         public byte SerializeByte(byte value = default(byte), int bitCount = sizeof(byte) * BSUtility.BITS)
         {
@@ -208,9 +215,11 @@ namespace BSNet.Stream
             BSPool.ReturnBuffer(bytes);
             return value;
         }
+
         #endregion
 
         #region Signed
+
         /// <inheritdoc/>
         public sbyte SerializeSByte(sbyte value = default(sbyte), int bitCount = sizeof(sbyte) * BSUtility.BITS)
         {
@@ -242,9 +251,11 @@ namespace BSNet.Stream
             SerializeULong(zigzag, bitCount);
             return value;
         }
+
         #endregion
 
         #region Floating point
+
         /// <inheritdoc/>
         public float SerializeFloat(BoundedRange range, float value = default(float))
         {
@@ -262,9 +273,11 @@ namespace BSNet.Stream
             SerializeUShort(half);
             return value;
         }
+
         #endregion
 
         #region Vectors & Quaternions
+
         /// <inheritdoc/>
         public Vector2 SerializeVector2(BoundedRange[] range, Vector2 vec = default(Vector2))
         {
@@ -313,15 +326,17 @@ namespace BSNet.Stream
 
             return quat;
         }
+
         #endregion
 
         #region String
+
         /// <inheritdoc/>
         public string SerializeString(Encoding encoding, string value = null)
         {
-            if (value.Equals(null))
+            if (value == null)
                 throw new ArgumentNullException(nameof(value));
-            if (encoding.Equals(null))
+            if (encoding == null)
                 throw new ArgumentNullException(nameof(encoding));
 
             byte[] bytes = encoding.GetBytes(value);
@@ -332,9 +347,11 @@ namespace BSNet.Stream
 
             return value;
         }
+
         #endregion
 
         #region IPs
+
         /// <inheritdoc/>
         public IPAddress SerializeIPAddress(IPAddress ipAddress)
         {
@@ -351,9 +368,11 @@ namespace BSNet.Stream
 
             return endPoint;
         }
+
         #endregion
 
         #region Bytes
+
         /// <inheritdoc/>
         public byte[] SerializeStream(int bitCount, byte[] data = null)
         {
@@ -385,6 +404,7 @@ namespace BSNet.Stream
             BSPool.ReturnBuffer(raw);
             return raw;
         }
+
         #endregion
 
         // Return internal stream

@@ -73,7 +73,7 @@ namespace BSNet
         /// <summary>
         /// The shared token, used in every message after authentication
         /// </summary>
-        public ulong Token { get { return LocalToken ^ RemoteToken; } }
+        public ulong Token => LocalToken ^ RemoteToken;
 
         private ushort[] acknowledgements = new ushort[BSUtility.RTT_BUFFER_SIZE];
         private double[] roundTrips = new double[BSUtility.RTT_BUFFER_SIZE];
@@ -180,7 +180,7 @@ namespace BSNet
         /// </summary>
         /// <param name="sentSequence">The sequence number to check against, and subsequently buffer</param>
         /// <returns>Whether we have already received an acknowledgement for this sequence number</returns>
-        public bool HasReceivedAcknowledgement(ushort sentSequence, double tickRate)
+        public bool HasReceivedAcknowledgement(ushort sentSequence)
         {
             bool hasReceived = acknowledgements[sentSequence % BSUtility.RTT_BUFFER_SIZE] == sentSequence;
 

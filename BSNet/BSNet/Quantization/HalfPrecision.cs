@@ -53,7 +53,7 @@ namespace BSNet.Quantization {
 				if (e < -10)
 					return (ushort)s;
 
-				m = m | 0x00800000;
+				m |= 0x00800000;
 
 				int t = 14 - e;
 				int a = (1 << (t - 1)) - 1;
@@ -95,11 +95,11 @@ namespace BSNet.Quantization {
 				if (mantissa != 0) {
 					while ((mantissa & 1024) == 0) {
 						exponent--;
-						mantissa = mantissa << 1;
+						mantissa <<= 1;
 					}
 
 					mantissa &= 0XFFFFFBFF;
-					result = ((uint)((((uint)value & 0x8000) << 16) | ((exponent + 127) << 23))) | (mantissa << 13);
+					result = (((uint)value & 0x8000) << 16) | ((exponent + 127) << 23) | (mantissa << 13);
 				} else {
 					result = (uint)((value & 0x8000) << 16);
 				}
