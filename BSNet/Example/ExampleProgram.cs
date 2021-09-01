@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Net;
+using System.Text;
 using System.Threading;
 
 namespace BSNet.Example
@@ -8,15 +10,22 @@ namespace BSNet.Example
     {
         public static void Main(string[] commands)
         {
-            //MainP2P();
-            MainServer(commands);
+            MainP2P();
+            //MainServer(commands);
         }
 
         private static void MainP2P()
         {
             // Testing a P2P implementation
-            ExamplePeer peer1 = new ExamplePeer(1609, "127.0.0.1", 1615);
-            ExamplePeer peer2 = new ExamplePeer(1615, "127.0.0.1", 1609);
+            ExamplePeer peer1 = new ExamplePeer(0, 250d, 0.25d, 0.001d);
+            ExamplePeer peer2 = new ExamplePeer(0, 250d, 0.25d, 0.001d);
+
+            // Construct peer endpoint
+            IPAddress peer2Address = IPAddress.Parse("127.0.0.1");
+            IPEndPoint peer2EndPoint = new IPEndPoint(peer2Address, peer2.Port);
+
+            // Send a request to connect
+            peer1.Connect(peer2EndPoint);
 
             while (true)
             {
@@ -32,8 +41,9 @@ namespace BSNet.Example
                     }
                     else if (key == ConsoleKey.R)
                     {
+                        int port = peer2.Port;
                         peer2.Dispose();
-                        peer2 = new ExamplePeer(1615, "127.0.0.1", 1609);
+                        peer2 = new ExamplePeer(port, 250d, 0.25d, 0.001d);
                     }
                 }
             }

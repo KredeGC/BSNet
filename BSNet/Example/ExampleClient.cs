@@ -44,7 +44,7 @@ namespace BSNet.Example
         }
 
         // Called when a connection has been established with this IPEndPoint
-        protected override void OnConnect(IPEndPoint endPoint)
+        protected override void OnConnect(IPEndPoint endPoint, IBSStream reader)
         {
             //// Send corrupt packet
             //SendMessageReliable(endPoint, writer =>
@@ -63,7 +63,7 @@ namespace BSNet.Example
         }
 
         // Called when a connection has been lost with this IPEndPoint
-        protected override void OnDisconnect(IPEndPoint endPoint) { }
+        protected override void OnDisconnect(IPEndPoint endPoint, IBSStream reader) { }
 
         // Called when we receive a message from this IPEndPoint
         protected override void OnReceiveMessage(IPEndPoint endPoint, ushort sequence, IBSStream reader)

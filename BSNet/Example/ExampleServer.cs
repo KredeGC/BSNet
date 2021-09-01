@@ -74,13 +74,13 @@ namespace BSNet.Example
         }
 
         // Called when a connection has been established with this IPEndPoint
-        protected override void OnConnect(IPEndPoint endPoint)
+        protected override void OnConnect(IPEndPoint endPoint, IBSStream reader)
         {
             Log($"{endPoint.ToString()} connected", LogLevel.Info);
         }
 
         // Called when a connection has been lost with this IPEndPoint
-        protected override void OnDisconnect(IPEndPoint endPoint)
+        protected override void OnDisconnect(IPEndPoint endPoint, IBSStream reader)
         {
             Log($"{endPoint.ToString()} disconnected", LogLevel.Info);
         }

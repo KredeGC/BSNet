@@ -39,6 +39,11 @@ namespace BSNet
         /// </summary>
         public virtual int Port => ((IPEndPoint)socket.LocalEndPoint).Port;
 
+        /// <summary>
+        /// The endPoint this socket listens on and sends from
+        /// </summary>
+        public virtual IPEndPoint LocalEndPoint => (IPEndPoint)socket.LocalEndPoint;
+
 #if NETWORK_DEBUG
         // Network debugging
         public virtual double SimulatedPacketLoss { set; get; } // 0-1000
@@ -162,6 +167,8 @@ namespace BSNet
             // Send a message with the generated token
             byte[] rawBytes = SendRawMessage(connection, ConnectionType.CONNECT, connection.LocalToken, writer =>
             {
+                OnRequestConnect(endPoint, writer);
+
                 // Pad message to 1024 bytes
                 writer.PadToEnd();
             });
@@ -174,12 +181,13 @@ namespace BSNet
         /// <exception cref="System.ArgumentNullException"/>
         /// <exception cref="System.ArgumentOutOfRangeException"/>
         /// <param name="endPoint">The endPoint to end the connection with</param>
-        public virtual void Disconnect(IPEndPoint endPoint)
+        /// <param name="action">The method to fill the buffer with data</param>
+        public virtual void Disconnect(IPEndPoint endPoint, Action<IBSStream> action = null)
         {
             if (connections.TryGetValue(endPoint, out ClientConnection connection))
             {
                 // Send an unreliable message with the generated token. We shouldn't wait around
-                SendRawMessage(connection, ConnectionType.DISCONNECT, connection.Token);
+                SendRawMessage(connection, ConnectionType.DISCONNECT, connection.Token, writer => action?.Invoke(writer));
 
                 if (!_disposing)
                     connections.Remove(endPoint);
@@ -417,6 +425,8 @@ namespace BSNet
                                 // Send a connection message to the sender
                                 byte[] bytes = SendRawMessage(connection, ConnectionType.CONNECT, connection.LocalToken, writer =>
                                 {
+                                    OnRequestConnect(endPoint, writer);
+
                                     // Pad message to 1024 bytes
                                     writer.PadToEnd();
                                 });
@@ -429,7 +439,7 @@ namespace BSNet
                             if (!connection.Authenticated)
                             {
                                 connection.Authenticate(header.Token, ElapsedTime);
-                                OnConnect(endPoint);
+                                OnConnect(endPoint, reader);
                             }
                         }
                         else
@@ -448,7 +458,7 @@ namespace BSNet
                                 connection.UpdateCorruption(false);
 
                                 connections.Remove(endPoint);
-                                OnDisconnect(endPoint);
+                                OnDisconnect(endPoint, reader);
                             }
                             else
                             {
@@ -585,7 +595,7 @@ namespace BSNet
             foreach (IPEndPoint ep in lastTimedOut)
             {
                 connections.Remove(ep);
-                OnDisconnect(ep);
+                OnDisconnect(ep, null);
             }
 
 
@@ -680,16 +690,25 @@ namespace BSNet
         protected abstract void OnReceiveAcknowledgement(IPEndPoint endPoint, ushort sequence);
 
         /// <summary>
-        /// Called when a connection is established with a remote endPoint
+        /// Called when a connection is about to be established
+        /// </summary>
+        /// <param name="endPoint">The address of the endPoint which wants to establish connection</param>
+        /// <param name="writer">The stream used to write a response message</param>
+        protected virtual void OnRequestConnect(IPEndPoint endPoint, IBSStream writer) { }
+
+        /// <summary>
+        /// Called when a connection is successfully established with a remote endPoint
         /// </summary>
         /// <param name="endPoint">The address of the endPoint which established connection</param>
-        protected abstract void OnConnect(IPEndPoint endPoint);
+        /// <param name="reader">The stream used to deserialize the contents of the connection message</param>
+        protected abstract void OnConnect(IPEndPoint endPoint, IBSStream reader);
 
         /// <summary>
         /// Called when a connection with a remote endPoint is lost
         /// </summary>
         /// <param name="endPoint">The address of the lost endPoint</param>
-        protected abstract void OnDisconnect(IPEndPoint endPoint);
+        /// <param name="reader">The stream used to deserialize the contents of the disconnect message, or null if timed out</param>
+        protected abstract void OnDisconnect(IPEndPoint endPoint, IBSStream reader);
 
         /// <summary>
         /// Called when this socket receives a packet from another, connected and authenticated endPoint

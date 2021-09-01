@@ -11,20 +11,13 @@ namespace BSNet.Example
 
         public override byte[] ProtocolVersion => new byte[] { 0xC0, 0xDE, 0xDE, 0xAD };
 
-        public ExamplePeer(int localPort, string peerIP, int peerPort) : base(localPort)
+        public ExamplePeer(int localPort, double latency, double loss, double corruption) : base(localPort)
         {
-            // Construct peer endpoint
-            IPAddress peerAddress = IPAddress.Parse(peerIP);
-            IPEndPoint peerEndPoint = new IPEndPoint(peerAddress, peerPort);
-
-            // Send a request to connect
-            Connect(peerEndPoint);
-
 #if NETWORK_DEBUG
             // Simulate bad network conditions
-            SimulatedPacketLatency = 250; // 250ms latency
-            SimulatedPacketLoss = 0.25d; // 25% packet loss
-            SimulatedPacketCorruption = 0.001d; // 0.1% packet corruption
+            SimulatedPacketLatency = latency; // 250ms latency
+            SimulatedPacketLoss = loss; // 25% packet loss
+            SimulatedPacketCorruption = corruption; // 0.1% packet corruption
 #endif
         }
 
@@ -34,7 +27,7 @@ namespace BSNet.Example
             Console.ForegroundColor = ConsoleColor.Gray;
             Console.Write($"[{DateTime.Now.TimeOfDay}]");
             Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.Write($"[{socket.LocalEndPoint}] ");
+            Console.Write($"[{Port}] ");
             switch (level)
             {
                 case LogLevel.Info:
@@ -50,10 +43,18 @@ namespace BSNet.Example
             Console.WriteLine(obj);
         }
 
+        // Called when an endPoint wishes to connect, or we wish to connect to them
+        protected override void OnRequestConnect(IPEndPoint endPoint, IBSStream writer)
+        {
+            writer.SerializeString(encoding, $"Hello from {Port}!");
+        }
+
         // Called when a connection has been established with this IPEndPoint
-        protected override void OnConnect(IPEndPoint endPoint)
+        protected override void OnConnect(IPEndPoint endPoint, IBSStream reader)
         {
             Log($"{endPoint.ToString()} connected", LogLevel.Info);
+
+            Log($"Received initial message: \"{reader.SerializeString(encoding)}\"", LogLevel.Info);
 
             //// Send corrupt packet
             //SendMessageReliable(endPoint, writer =>
@@ -64,15 +65,15 @@ namespace BSNet.Example
             //    writer.SerializeBytes(rawBytes);
             //});
 
-            // Create a packet
-            ExamplePacket serializable = new ExamplePacket($"Hello network from {socket.LocalEndPoint} to {endPoint}!", 3.1415f);
+            //// Create a packet
+            //ExamplePacket serializable = new ExamplePacket($"Hello network from {socket.LocalEndPoint} to {endPoint}!", 3.1415f);
 
-            // Serialize the message and send it to the connected IPEndPoint
-            SendMessageReliable(endPoint, serializable);
+            //// Serialize the message and send it to the connected IPEndPoint
+            //SendMessageReliable(endPoint, serializable);
         }
 
         // Called when a connection has been lost with this IPEndPoint
-        protected override void OnDisconnect(IPEndPoint endPoint)
+        protected override void OnDisconnect(IPEndPoint endPoint, IBSStream reader)
         {
             Log($"{endPoint.ToString()} disconnected", LogLevel.Info);
 
