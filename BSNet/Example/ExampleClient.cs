@@ -5,7 +5,7 @@ using System.Text;
 
 namespace BSNet.Example
 {
-    public class ExampleClient : BSSocket
+    public class ExampleClient : BSSocket<ClientConnection>
     {
         protected Encoding encoding = new ASCIIEncoding();
 

@@ -14,34 +14,34 @@ namespace BSNet
         /// The estimated round-trip-time
         /// <para/>Note: Uses an exponentially smoothed average
         /// </summary>
-        public double RTT { private set; get; }
+        public double RTT { private set; get; } = 0;
 
         /// <summary>
         /// The estimated packet loss
         /// <para/>Note: Uses an exponentially smoothed average
         /// </summary>
-        public double PacketLoss { private set; get; }
+        public double PacketLoss { private set; get; } = 0;
 
         /// <summary>
         /// The estimated packet corruption
         /// <para/>Note: Uses an exponentially smoothed average
         /// </summary>
-        public double PacketCorruption { private set; get; }
+        public double PacketCorruption { private set; get; } = 0;
 
         /// <summary>
         /// The sequence number of the last sent packet
         /// </summary>
-        public ushort LocalSequence { private set; get; }
+        public ushort LocalSequence { private set; get; } = 0;
 
         /// <summary>
         /// The sequence number of the last received packet
         /// </summary>
-        public ushort RemoteSequence { private set; get; }
+        public ushort RemoteSequence { private set; get; } = 0;
 
         /// <summary>
         /// The bitfield of the last 32 received packets
         /// </summary>
-        public uint AckBits { private set; get; }
+        public uint AckBits { private set; get; } = 0;
 
         /// <summary>
         /// The last time we sent this client a message
@@ -52,7 +52,7 @@ namespace BSNet
         /// The last time we received a message from this client
         /// </summary>
         public double LastReceived { private set; get; }
-        
+
 
         /// <summary>
         /// The locally generated token
@@ -68,37 +68,32 @@ namespace BSNet
         /// Whether this client has been authenticated or not
         /// <para/>Messages can only be sent after authentication
         /// </summary>
-        public bool Authenticated { private set; get; }
+        public bool Authenticated { private set; get; } = false;
 
         /// <summary>
         /// The shared token, used in every message after authentication
         /// </summary>
         public ulong Token => LocalToken ^ RemoteToken;
 
-        private ushort[] acknowledgements = new ushort[BSUtility.RTT_BUFFER_SIZE];
-        private double[] roundTrips = new double[BSUtility.RTT_BUFFER_SIZE];
+        protected ushort[] acknowledgements = new ushort[BSUtility.RTT_BUFFER_SIZE];
+        protected double[] roundTrips = new double[BSUtility.RTT_BUFFER_SIZE];
 
-        public ClientConnection(IPEndPoint endPoint, double time, ulong localToken, ulong remoteToken)
+        public virtual void Initialize(IPEndPoint endPoint, double time, ulong localToken, ulong remoteToken)
         {
             AddressPoint = endPoint;
-            RTT = 0;
-            PacketLoss = 0;
-            LocalSequence = 0;
-            RemoteSequence = 0;
-            AckBits = 0;
+
             LastSent = time;
             LastReceived = time;
 
             LocalToken = localToken;
             RemoteToken = remoteToken;
-            Authenticated = false;
         }
 
         /// <summary>
         /// Updates the packet corruption estimate
         /// </summary>
         /// <param name="corrupted">Whether this newly received packet was corrupted or not</param>
-        public void UpdateCorruption(bool corrupted)
+        public virtual void UpdateCorruption(bool corrupted)
         {
             PacketCorruption = PacketCorruption * 0.99d + (corrupted ? 0.01d : 0);
         }
@@ -107,7 +102,7 @@ namespace BSNet
         /// Increments the local sequence and updates the timer and estimated packet loss
         /// </summary>
         /// <param name="time">The current time</param>
-        public void IncrementSequence(double time)
+        public virtual void IncrementSequence(double time)
         {
             // Calculate packet loss
             int packetsLost = 0;
@@ -118,7 +113,7 @@ namespace BSNet
                 if (acknowledgements[seq % BSUtility.RTT_BUFFER_SIZE] != seq) // If we haven't received an acknowledgement for this packet yet
                 {
                     double timeSinceSent = time - roundTrips[seq % BSUtility.RTT_BUFFER_SIZE];
-                    
+
                     // Compare to round-trip time
                     if (timeSinceSent >= RTT)
                         packetsLost++;
@@ -140,7 +135,7 @@ namespace BSNet
         /// <param name="receivedToken">The token to compare against</param>
         /// <param name="time">The current time</param>
         /// <returns>Whether the client was authenticated</returns>
-        public bool Authenticate(ulong receivedToken, double time)
+        public virtual bool Authenticate(ulong receivedToken, double time)
         {
             if (Authenticated)
             {
@@ -149,6 +144,7 @@ namespace BSNet
                     LastReceived = time;
                     return true;
                 }
+
                 return false;
             }
             else
@@ -165,7 +161,7 @@ namespace BSNet
         /// </summary>
         /// <param name="sequence">The sequence we have acknowledged</param>
         /// <param name="time">The current time, to compare</param>
-        public void UpdateRTT(ushort sequence, double time)
+        public virtual void UpdateRTT(ushort sequence, double time)
         {
             if (roundTrips[sequence % BSUtility.RTT_BUFFER_SIZE] > 0)
             {
@@ -180,7 +176,7 @@ namespace BSNet
         /// </summary>
         /// <param name="sentSequence">The sequence number to check against, and subsequently buffer</param>
         /// <returns>Whether we have already received an acknowledgement for this sequence number</returns>
-        public bool HasReceivedAcknowledgement(ushort sentSequence)
+        public virtual bool ReceiveAcknowledgement(ushort sentSequence)
         {
             bool hasReceived = acknowledgements[sentSequence % BSUtility.RTT_BUFFER_SIZE] == sentSequence;
 
@@ -193,7 +189,7 @@ namespace BSNet
         /// Saves the received sequence number in the acknowledged bits, sending it with next packets
         /// </summary>
         /// <param name="receivedSequence">The received sequence number to acknowledge</param>
-        public void Acknowledge(ushort receivedSequence)
+        public virtual void Acknowledge(ushort receivedSequence)
         {
             // ackBits = 0110;1
             // remoteSequence = 5;
@@ -229,6 +225,6 @@ namespace BSNet
         /// </summary>
         /// <param name="receivedSequence">The sequence to test</param>
         /// <returns>Whether the sequence number was acknowledged</returns>
-        public bool IsAcknowledged(ushort receivedSequence) => BSUtility.IsAcknowledged(AckBits, RemoteSequence, receivedSequence);
+        public virtual bool IsAcknowledged(ushort receivedSequence) => BSUtility.IsAcknowledged(AckBits, RemoteSequence, receivedSequence);
     }
 }

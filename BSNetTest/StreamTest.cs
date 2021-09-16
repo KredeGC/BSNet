@@ -1,5 +1,4 @@
-﻿using BSNet;
-using BSNet.Quantization;
+﻿using BSNet.Quantization;
 using BSNet.Stream;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -102,7 +101,7 @@ namespace BSNetTest
                 // Read the second value as a byte array
                 inlineBytes = reader.SerializeStream(reader.TotalBits);
             }
-            
+
             using (BSReader reader = BSReader.Get(inlineBytes))
             {
                 // Read the second value from the byte array

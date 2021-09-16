@@ -5,10 +5,8 @@ using System.Text;
 
 namespace BSNet.Example
 {
-    public class ExamplePeer : BSSocket
+    public class ExamplePeer : BSSocket<ClientConnection>
     {
-        protected Encoding encoding = new ASCIIEncoding();
-
         public override byte[] ProtocolVersion => new byte[] { 0xC0, 0xDE, 0xDE, 0xAD };
 
         public ExamplePeer(int localPort, double latency, double loss, double corruption) : base(localPort)
@@ -46,7 +44,7 @@ namespace BSNet.Example
         // Called when an endPoint wishes to connect, or we wish to connect to them
         protected override void OnRequestConnect(IPEndPoint endPoint, IBSStream writer)
         {
-            writer.SerializeString(encoding, $"Hello from {Port}!");
+            writer.SerializeString(Encoding.ASCII, $"Hello from {Port}!");
         }
 
         // Called when a connection has been established with this IPEndPoint
@@ -54,7 +52,7 @@ namespace BSNet.Example
         {
             Log($"{endPoint.ToString()} connected", LogLevel.Info);
 
-            Log($"Received initial message: \"{reader.SerializeString(encoding)}\"", LogLevel.Info);
+            Log($"Received initial message: \"{reader.SerializeString(Encoding.ASCII)}\"", LogLevel.Info);
 
             //// Send corrupt packet
             //SendMessageReliable(endPoint, writer =>

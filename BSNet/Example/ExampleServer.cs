@@ -5,7 +5,7 @@ using System.Text;
 
 namespace BSNet.Example
 {
-    public class ExampleServer : BSSocket
+    public class ExampleServer : BSSocket<ClientConnection>
     {
         public override byte[] ProtocolVersion => new byte[] { 0xBE, 0xEB, 0xB0, 0x0B };
 
