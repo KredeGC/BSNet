@@ -42,7 +42,7 @@ namespace BSNet.Example
         }
 
         // Called when an endPoint wishes to connect, or we wish to connect to them
-        protected override void OnRequestConnect(IPEndPoint endPoint, IBSStream writer)
+        protected override void OnRequestConnect(IPEndPoint endPoint, IBSStream reader, IBSStream writer)
         {
             writer.SerializeString(Encoding.ASCII, $"Hello from {Port}!");
         }
@@ -50,7 +50,7 @@ namespace BSNet.Example
         // Called when a connection has been established with this IPEndPoint
         protected override void OnConnect(IPEndPoint endPoint, IBSStream reader)
         {
-            Log($"{endPoint.ToString()} connected", LogLevel.Info);
+            Log($"{endPoint} connected", LogLevel.Info);
 
             Log($"Received initial message: \"{reader.SerializeString(Encoding.ASCII)}\"", LogLevel.Info);
 

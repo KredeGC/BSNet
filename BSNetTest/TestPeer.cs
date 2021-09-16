@@ -23,7 +23,7 @@ namespace BSNetTest
         }
 
         // Called when an endPoint wishes to connect, or we wish to connect to them
-        protected override void OnRequestConnect(IPEndPoint endPoint, IBSStream writer)
+        protected override void OnRequestConnect(IPEndPoint endPoint, IBSStream reader, IBSStream writer)
         {
             writer.SerializeUInt(21U, 7);
             writer.SerializeString(Encoding.ASCII, "Hello world!");

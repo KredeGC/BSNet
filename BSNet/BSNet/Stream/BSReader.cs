@@ -215,6 +215,7 @@ namespace BSNet.Stream
         {
             if (Corrupt) return 0;
             byte[] bytes = SerializeBytes(bitCount);
+            if (Corrupt) return 0;
 
             ulong val = 0;
             int shift = (bytes.Length - 1) * 8;

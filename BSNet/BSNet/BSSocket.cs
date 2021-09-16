@@ -14,7 +14,7 @@ using System.Diagnostics;
 
 namespace BSNet
 {
-    public abstract class BSSocket<T> : IDisposable where T: ClientConnection, new()
+    public abstract class BSSocket<T> : IDisposable where T : ClientConnection, new()
     {
         /// <summary>
         /// The elapsed time since the socket was created
@@ -174,7 +174,7 @@ namespace BSNet
             // Send a message with the generated token
             byte[] rawBytes = SendRawMessage(connection, ConnectionType.CONNECT, connection.LocalToken, writer =>
             {
-                OnRequestConnect(endPoint, writer);
+                OnRequestConnect(endPoint, null, writer);
 
                 // Pad message to 1024 bytes
                 writer.PadToEnd();
@@ -408,6 +408,7 @@ namespace BSNet
                     {
                         if (length == BSUtility.PACKET_MAX_SIZE) // Make sure this message has been padded to avoid DDoS amplification
                         {
+                            bool sendResponse = false;
                             if (connections.TryGetValue(endPoint, out T connection))
                             {
                                 // Acknowledge this packet
@@ -418,30 +419,39 @@ namespace BSNet
                                 // Add this connection to the list
                                 ulong localToken = Cryptography.GenerateToken();
                                 connection = new T();
-                                connection.Initialize(endPoint, ElapsedTime, localToken, 0);
+                                connection.Initialize(endPoint, ElapsedTime, localToken, header.Token);
                                 connections.Add(endPoint, connection);
 
                                 // Acknowledge this packet
                                 connection.Acknowledge(header.Sequence);
 
-                                // Send a connection message to the sender
-                                byte[] bytes = SendRawMessage(connection, ConnectionType.CONNECT, connection.LocalToken, writer =>
-                                {
-                                    OnRequestConnect(endPoint, writer);
-
-                                    // Pad message to 1024 bytes
-                                    writer.PadToEnd();
-                                });
-                                AddReliableMessage(connection, bytes);
+                                sendResponse = true;
                             }
 
                             connection.UpdateCorruption(false);
+
+                            byte[] readerBytes = reader.SerializeStream(reader.TotalBits);
 
                             // If this connection is not authenticated
                             if (!connection.Authenticated)
                             {
                                 connection.Authenticate(header.Token, ElapsedTime);
-                                OnConnect(endPoint, reader);
+                                using (BSReader reader2 = BSReader.Get(readerBytes))
+                                    OnConnect(endPoint, reader2);
+                            }
+
+                            // Send a connection message to the sender
+                            if (sendResponse && connections.ContainsKey(endPoint))
+                            {
+                                byte[] bytes = SendRawMessage(connection, ConnectionType.CONNECT, connection.LocalToken, writer =>
+                                {
+                                    using (BSReader reader2 = BSReader.Get(readerBytes))
+                                        OnRequestConnect(endPoint, reader2, writer);
+
+                                    // Pad message to 1024 bytes
+                                    writer.PadToEnd();
+                                });
+                                AddReliableMessage(connection, bytes);
                             }
                         }
                         else
@@ -690,14 +700,17 @@ namespace BSNet
         /// </summary>
         /// <param name="endPoint">The address of the endPoint which acknowledged the message</param>
         /// <param name="sequence">The sequence number that was acknowledged</param>
-        protected abstract void OnReceiveAcknowledgement(IPEndPoint endPoint, ushort sequence);
+        protected virtual void OnReceiveAcknowledgement(IPEndPoint endPoint, ushort sequence)
+        {
+        }
 
         /// <summary>
-        /// Called when a connection is about to be established
+        /// Called when we want to send a connection message to the given endPoint
         /// </summary>
-        /// <param name="endPoint">The address of the endPoint which wants to establish connection</param>
+        /// <param name="endPoint">The endPoint we want to establish connection with</param>
+        /// <param name="reader">The stream used to write a response message</param>
         /// <param name="writer">The stream used to write a response message</param>
-        protected virtual void OnRequestConnect(IPEndPoint endPoint, IBSStream writer)
+        protected virtual void OnRequestConnect(IPEndPoint endPoint, IBSStream reader, IBSStream writer)
         {
         }
 
