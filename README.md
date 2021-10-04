@@ -41,52 +41,74 @@ using System.Text;
 
 public class P2PExample : BSSocket
 {
-    public override byte[] ProtocolVersion => new byte[] { 0xC0, 0xDE, 0xDE, 0xAD };
+  public override byte[] ProtocolVersion => new byte[] { 0xC0, 0xDE, 0xDE, 0xAD };
 
-    public P2PExample(int localPort, string peerIP, int peerPort) : base(localPort)
+  public P2PExample() : base(0) { }
+
+  // For logging
+  protected override void Log(object obj, LogLevel level)
+  {
+    Console.WriteLine(obj);
+  }
+
+  // Called when an endPoint wishes to connect, or we wish to connect to them
+  protected override void OnRequestConnect(IPEndPoint endPoint, IBSStream writer)
+  {
+    writer.SerializeString(Encoding.ASCII, $"Hello from {Port}!");
+  }
+
+  // Called when a connection has been established with this IPEndPoint
+  protected override void OnConnect(IPEndPoint endPoint, IBSStream reader)
+  {
+    Log($"{endPoint.ToString()} connected", LogLevel.Info);
+
+    Log($"Received initial message: \"{reader.SerializeString(Encoding.ASCII)}\"", LogLevel.Info);
+  }
+
+  // Called when a connection has been lost with this IPEndPoint
+  protected override void OnDisconnect(IPEndPoint endPoint, IBSStream reader)
+  {
+    Log($"{endPoint.ToString()} disconnected", LogLevel.Info);
+
+    // Attempt to reconnect
+    Connect(endPoint);
+  }
+
+  // Called when we receive a message from this IPEndPoint
+  protected override void OnReceiveMessage(IPEndPoint endPoint, ushort sequence, IBSStream reader) { }
+}
+
+public class Program {
+  public static void Main(string[] args)
+  {
+    // Instantiate 2 BSSockets
+    P2PExample peer1 = new P2PExample();
+    P2PExample peer2 = new P2PExample();
+
+    // Construct peer endpoint
+    IPAddress peer2Address = IPAddress.Parse("127.0.0.1");
+    IPEndPoint peer2EndPoint = new IPEndPoint(peer2Address, peer2.Port);
+
+    // Send a request to connect
+    peer1.Connect(peer2EndPoint);
+
+    while (true)
     {
-        // Construct peer endpoint
-        IPAddress peerAddress = IPAddress.Parse(peerIP);
-        IPEndPoint peerEndPoint = new IPEndPoint(peerAddress, peerPort);
+      // Continuously update the clients
+      peer1.Update();
+      peer2.Update();
 
-        // Send a request to connect
-        Connect(peerEndPoint);
+      // Exit if the user presses Q
+      if (Console.KeyAvailable)
+      {
+        if (Console.ReadKey(true).Key == ConsoleKey.Q)
+          break;
+      }
     }
 
-    // For logging
-    protected override void Log(object obj, LogLevel level)
-    {
-        Console.WriteLine(obj);
-    }
-
-    // Called when an endPoint wishes to connect, or we wish to connect to them
-    protected override void OnRequestConnect(IPEndPoint endPoint, IBSStream writer)
-    {
-        writer.SerializeString(Encoding.ASCII, $"Hello from {Port}!");
-    }
-
-    // Called when a connection has been established with this IPEndPoint
-    protected override void OnConnect(IPEndPoint endPoint, IBSStream reader)
-    {
-        Log($"{endPoint.ToString()} connected", LogLevel.Info);
-
-        Log($"Received initial message: \"{reader.SerializeString(Encoding.ASCII)}\"", LogLevel.Info);
-    }
-
-    // Called when a connection has been lost with this IPEndPoint
-    protected override void OnDisconnect(IPEndPoint endPoint, IBSStream reader)
-    {
-        Log($"{endPoint.ToString()} disconnected", LogLevel.Info);
-
-        // Attempt to reconnect
-        Connect(endPoint);
-    }
-
-    // Called when we receive a message from this IPEndPoint
-    protected override void OnReceiveMessage(IPEndPoint endPoint, ushort sequence, IBSStream reader) { }
-
-    // Called when we receive an acknowledgement for a packet from this IPEndPoint
-    protected override void OnReceiveAcknowledgement(IPEndPoint endPoint, ushort sequence) { }
+    peer1.Dispose();
+    peer2.Dispose();
+  }
 }
 ```
 
