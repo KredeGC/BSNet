@@ -416,6 +416,20 @@ namespace BSNet.Stream
 
         #endregion
 
+        /// <inheritdoc/>
+        public byte[] ToArray()
+        {
+            int oldByte = bytePos;
+            int oldBit = bitPos;
+            int offset = (BSUtility.BITS - TotalBits % BSUtility.BITS) % BSUtility.BITS;
+            
+            byte[] data = Read(TotalBits, offset);
+            bytePos = oldByte;
+            bitPos = oldBit;
+
+            return data;
+        }
+
         // Read internally
         private byte[] Read(int bitCount, int offset = 0)
         {
@@ -433,6 +447,16 @@ namespace BSNet.Stream
             // The total length of the bytes
             int length = (bitCount - 1) / BSUtility.BITS + 1;
             byte[] data = new byte[length];
+            
+            // Optimization for even bits
+            if (bitPos == 1 && bitCount % 8 == 0 && offset % 8 == 0)
+            {
+                // Copy stream into byte array
+                Buffer.BlockCopy(internalStream, bytePos, data, 0, bitCount / BSUtility.BITS);
+                bytePos += bitCount / BSUtility.BITS;
+
+                return data;
+            }
 
             // The offset to shift by
             int totalOffset = (BSUtility.BITS - (bitCount + offset) % BSUtility.BITS) % BSUtility.BITS;
@@ -475,6 +499,10 @@ namespace BSNet.Stream
                 bitPos -= BSUtility.BITS;
                 bytePos++;
             }
+            
+            // Reverse to little endian
+            if (!BitConverter.IsLittleEndian)
+                Array.Reverse(data);
 
             return data;
         }

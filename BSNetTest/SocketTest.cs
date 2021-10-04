@@ -36,8 +36,8 @@ namespace BSNetTest
         public void ConnectBadNetworkTest()
         {
             // Testing a P2P implementation
-            TestPeer peer1 = new TestPeer(0, 350d, 0.5d, 0.01d);
-            TestPeer peer2 = new TestPeer(0, 350d, 0.5d, 0.01d);
+            TestPeer peer1 = new TestPeer(0, 250d, 0.5d, 0.01d);
+            TestPeer peer2 = new TestPeer(0, 250d, 0.5d, 0.01d);
 
             // Construct peer endpoint
             IPAddress peer2Address = IPAddress.Parse("127.0.0.1");

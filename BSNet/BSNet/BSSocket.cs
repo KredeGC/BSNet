@@ -430,14 +430,15 @@ namespace BSNet
 
                             connection.UpdateCorruption(false);
 
-                            byte[] readerBytes = reader.SerializeStream(reader.TotalBits);
+                            byte[] readerBytes = reader.ToArray();
+                            //byte[] readerBytes = reader.SerializeStream(reader.TotalBits);
 
                             // If this connection is not authenticated
                             if (!connection.Authenticated)
                             {
                                 connection.Authenticate(header.Token, ElapsedTime);
-                                using (BSReader reader2 = BSReader.Get(readerBytes))
-                                    OnConnect(endPoint, reader2);
+                                //using (BSReader reader2 = BSReader.Get(readerBytes))
+                                OnConnect(endPoint, reader);
                             }
 
                             // Send a connection message to the sender

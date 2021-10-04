@@ -407,7 +407,7 @@ namespace BSNet.Stream
 
         #endregion
 
-        // Return internal stream
+        /// <inheritdoc/>
         public byte[] ToArray()
         {
             int size = (TotalBits - 1) / BSUtility.BITS + 1;
@@ -427,6 +427,7 @@ namespace BSNet.Stream
 
             int expansion = bytePos + (bitPos - 1 + bitCount - 1) / BSUtility.BITS + 1;
 
+            // Expand internal stream
             if (expansion > internalStream.Length)
             {
                 byte[] bytes = BSPool.GetBuffer(expansion);
@@ -437,12 +438,23 @@ namespace BSNet.Stream
                 internalStream = bytes;
             }
 
+            // Reverse to little endian
             if (!BitConverter.IsLittleEndian)
                 Array.Reverse(data);
 
             // Length of the data
             int byteCountCeil = (bitCount - 1 + bitPos - 1) / BSUtility.BITS + 1;
             int totalOffset = data.Length * BSUtility.BITS - bitCount - offset; // 21
+            
+            // Optimization for even bits
+            if (bitPos == 1 && bitCount % 8 == 0 && offset % 8 == 0)
+            {
+                // Copy byte array into stream
+                Buffer.BlockCopy(data, offset / 8 + data.Length - bitCount / BSUtility.BITS, internalStream, bytePos, bitCount / BSUtility.BITS);
+                bytePos += bitCount / BSUtility.BITS;
+
+                return;
+            }
 
             // The offset to shift by
             int leftShift = totalOffset % BSUtility.BITS; // 5

@@ -37,6 +37,7 @@ namespace BSNet.Stream
         bool Corrupt { get; }
 
         #region Padding
+        
         /// <summary>
         /// Adds padding to the end of the stream
         /// </summary>
@@ -52,9 +53,11 @@ namespace BSNet.Stream
         /// <exception cref="System.ArgumentOutOfRangeException"/>
         /// <returns>The amount of padding added</returns>
         int PadToByte();
+        
         #endregion
 
         #region Bool
+        
         /// <summary>
         /// Serializes a bool as a single bit
         /// </summary>
@@ -63,9 +66,11 @@ namespace BSNet.Stream
         /// <param name="value">The bool to serialize</param>
         /// <returns>The serialized bool</returns>
         bool SerializeBool(bool value = default(bool));
+        
         #endregion
 
         #region Unsigned
+        
         /// <summary>
         /// Serializes a byte, using the given bitCount
         /// </summary>
@@ -105,9 +110,11 @@ namespace BSNet.Stream
         /// <param name="bitCount">The amount of bits to use, from little-endian</param>
         /// <returns>The serialized unsigned long</returns>
         ulong SerializeULong(ulong value = default(ulong), int bitCount = sizeof(ulong) * BSUtility.BITS);
+        
         #endregion
 
         #region Signed
+        
         /// <summary>
         /// Serializes a signed byte, using the given bitCount
         /// </summary>
@@ -147,9 +154,11 @@ namespace BSNet.Stream
         /// <param name="bitCount">The amount of bits to use, from little-endian</param>
         /// <returns>The serialized long</returns>
         long SerializeLong(long value = default(long), int bitCount = sizeof(long) * BSUtility.BITS);
+        
         #endregion
 
         #region Floating point
+        
         /// <summary>
         /// Serializes and quantizes a float, using a BoundedRange
         /// </summary>
@@ -168,9 +177,11 @@ namespace BSNet.Stream
         /// <param name="value">The float to serialize and quantize</param>
         /// <returns>The serialized float</returns>
         float SerializeHalf(float value = default(float));
+        
         #endregion
 
         #region Vectors & Quaternions
+        
         /// <summary>
         /// Serializes and quantizes a Vector2, using an array of BoundedRange
         /// </summary>
@@ -210,9 +221,11 @@ namespace BSNet.Stream
         /// <param name="quat">The Quaternion to serialize</param>
         /// <returns>The serialized Quaternion</returns>
         Quaternion SerializeQuaternion(int bitsPerElement = 12, Quaternion quat = default(Quaternion));
+        
         #endregion
 
         #region String
+        
         /// <summary>
         /// Serializes a string, using a TextEncoding
         /// </summary>
@@ -222,9 +235,11 @@ namespace BSNet.Stream
         /// <param name="value">The string to serialize</param>
         /// <returns>The serialized string</returns>
         string SerializeString(Encoding encoding, string value = null);
+        
         #endregion
         
         #region IPs
+        
         /// <summary>
         /// Serializes an IPAddress
         /// </summary>
@@ -242,9 +257,11 @@ namespace BSNet.Stream
         /// <param name="endPoint">The IPEndPoint to serialize</param>
         /// <returns>The serialized IPEndPoint</returns>
         IPEndPoint SerializeIPEndPoint(IPEndPoint endPoint = default(IPEndPoint));
+        
         #endregion
 
         #region Bytes
+        
         /// <summary>
         /// Serializes a given amount from an array of bytes, and shifts everything to be byte-aligned
         /// </summary>
@@ -276,6 +293,13 @@ namespace BSNet.Stream
         /// <param name="bytes">The byte array to serialize</param>
         /// <returns>The serialized byte array</returns>
         byte[] SerializeBytes(byte[] bytes = null);
+        
         #endregion
+
+        /// <summary>
+        /// Return a copy of the internal stream as a byte array without reading/writing
+        /// </summary>
+        /// <returns>A copy of the internal stream</returns>
+        byte[] ToArray();
     }
 }

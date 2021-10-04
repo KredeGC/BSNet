@@ -99,7 +99,8 @@ namespace BSNetTest
                 Assert.AreEqual(904U, reader.SerializeUInt(0, 10));
 
                 // Read the second value as a byte array
-                inlineBytes = reader.SerializeStream(reader.TotalBits);
+                inlineBytes = reader.ToArray(); // Serializes stream without reading
+                //inlineBytes = reader.SerializeStream(reader.TotalBits); // Serializes stream by reading
             }
 
             using (BSReader reader = BSReader.Get(inlineBytes))
