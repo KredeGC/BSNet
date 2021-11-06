@@ -72,13 +72,23 @@ namespace BSNet.Quantization {
 		};
 	}
 
+    [System.Serializable]
 	public class BoundedRange {
         public int BitsRequired { get; }
         public float Precision => precision;
 
-        private readonly float minValue;
-		private readonly float maxValue;
-		private readonly float precision;
+#if (ENABLE_MONO || ENABLE_IL2CPP)
+        [SerializeField]
+        private float minValue;
+        [SerializeField]
+        private float maxValue;
+        [SerializeField]
+        private float precision;
+#else
+        private float minValue;
+        private float maxValue;
+        private float precision;
+#endif
         private readonly uint mask;
 
 		public BoundedRange(float minValue, float maxValue, float precision) {

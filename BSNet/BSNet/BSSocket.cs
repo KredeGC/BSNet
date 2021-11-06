@@ -14,7 +14,11 @@ using System.Diagnostics;
 
 namespace BSNet
 {
+#if (ENABLE_MONO || ENABLE_IL2CPP)
+    public class BSSocket<T> : MonoBehaviour where T : ClientConnection, new()
+#else
     public abstract class BSSocket<T> : IDisposable where T : ClientConnection, new()
+#endif
     {
         /// <summary>
         /// The elapsed time since the socket was created
@@ -61,7 +65,7 @@ namespace BSNet
 
         // Socket stuff
         protected double nextMessage;
-        protected readonly IPEndPoint localEndPoint;
+        protected IPEndPoint localEndPoint;
         protected Socket socket;
         protected bool _disposing;
         protected const int SIO_UDP_CONNRESET = -1744830452;
@@ -77,7 +81,11 @@ namespace BSNet
         protected readonly List<IPEndPoint> lastTimedOut = new List<IPEndPoint>();
         protected readonly List<IPEndPoint> lastHeartBeats = new List<IPEndPoint>();
 
+#if (ENABLE_MONO || ENABLE_IL2CPP)
+        protected void Init(int port, int ticksPerSecond = 50)
+#else
         protected BSSocket(int port, int ticksPerSecond = 50)
+#endif
         {
             TickRate = 1d / ticksPerSecond;
 
@@ -104,10 +112,18 @@ namespace BSNet
 #endif
         }
 
+#if !(ENABLE_MONO || ENABLE_IL2CPP)
         ~BSSocket()
         {
             Dispose(false);
         }
+#else
+        protected virtual void OnDestroy()
+        {
+            socket.Close();
+            socket = null;
+        }
+#endif
 
         /// <summary>
         /// Disposes of this socket and tries to gracefully disconnect with any connected endPoints
