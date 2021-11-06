@@ -8,7 +8,7 @@ namespace BSNet.Datagram
     {
         private static Queue<Header> headerPool = new Queue<Header>();
 
-        public byte Type { private set; get; }
+        public ConnectionType Type { private set; get; }
         public ushort Sequence { private set; get; }
         public ushort Ack { private set; get; }
         public uint AckBits { private set; get; }
@@ -73,7 +73,7 @@ namespace BSNet.Datagram
         /// <param name="ackBits"></param>
         /// <param name="token"></param>
         /// <returns>A new header</returns>
-        public static Header GetHeader(byte type, ushort sequence, ushort ack, uint ackBits, ulong token)
+        public static Header GetHeader(ConnectionType type, ushort sequence, ushort ack, uint ackBits, ulong token)
         {
             lock (headerPool)
             {
@@ -112,7 +112,7 @@ namespace BSNet.Datagram
         /// <param name="stream">The stream to serialize into</param>
         public void Serialize(IBSStream stream)
         {
-            Type = stream.SerializeByte(Type, 2);
+            Type = (ConnectionType)stream.SerializeByte((byte)Type, 2);
             Sequence = stream.SerializeUShort(Sequence);
             Ack = stream.SerializeUShort(Ack);
             AckBits = stream.SerializeUInt(AckBits);

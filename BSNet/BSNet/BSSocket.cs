@@ -188,7 +188,7 @@ namespace BSNet
             }
 
             // Send a message with the generated token
-            byte[] rawBytes = SendRawMessage(connection, ConnectionType.CONNECT, connection.LocalToken, writer =>
+            byte[] rawBytes = SendRawMessage(connection, ConnectionType.Connect, connection.LocalToken, writer =>
             {
                 OnRequestConnect(endPoint, null, writer);
 
@@ -210,7 +210,7 @@ namespace BSNet
             if (connections.TryGetValue(endPoint, out T connection))
             {
                 // Send an unreliable message with the generated token. We shouldn't wait around
-                SendRawMessage(connection, ConnectionType.DISCONNECT, connection.Token, writer => action?.Invoke(writer));
+                SendRawMessage(connection, ConnectionType.Disconnect, connection.Token, writer => action?.Invoke(writer));
 
                 if (!_disposing)
                     connections.Remove(endPoint);
@@ -246,7 +246,7 @@ namespace BSNet
             // Check if authenticated
             if (connections.TryGetValue(endPoint, out T connection) && connection.Authenticated)
             {
-                SendRawMessage(connection, ConnectionType.MESSAGE, connection.Token, writer => action?.Invoke(writer));
+                SendRawMessage(connection, ConnectionType.Message, connection.Token, writer => action?.Invoke(writer));
 
                 return connection.LocalSequence;
             }
@@ -283,7 +283,7 @@ namespace BSNet
             // Check if authenticated
             if (connections.TryGetValue(endPoint, out T connection) && connection.Authenticated)
             {
-                byte[] rawBytes = SendRawMessage(connection, ConnectionType.MESSAGE, connection.Token, writer => action?.Invoke(writer));
+                byte[] rawBytes = SendRawMessage(connection, ConnectionType.Message, connection.Token, writer => action?.Invoke(writer));
 
                 // Add message to backlog
                 AddReliableMessage(connection, rawBytes);
@@ -303,7 +303,7 @@ namespace BSNet
         protected virtual void SendHeartbeat(T connection)
         {
             if (connection.Authenticated)
-                SendRawMessage(connection, ConnectionType.HEARTBEAT, connection.Token);
+                SendRawMessage(connection, ConnectionType.Heartbeat, connection.Token);
         }
 
         /// <summary>
@@ -316,7 +316,7 @@ namespace BSNet
         /// <param name="token">The token to send with it</param>
         /// <param name="action">The method to fill the buffer with data</param>
         /// <returns>The bytes that have been sent to the endPoint</returns>
-        protected virtual byte[] SendRawMessage(T connection, byte type, ulong token, Action<IBSStream> action = null)
+        protected virtual byte[] SendRawMessage(T connection, ConnectionType type, ulong token, Action<IBSStream> action = null)
         {
             if (connection == null)
                 throw new ArgumentNullException(nameof(connection));
@@ -420,7 +420,7 @@ namespace BSNet
                 using (Header header = Header.GetHeader(reader))
                 {
                     // Handle the message
-                    if (header.Type == ConnectionType.CONNECT) // If this endPoint wants to establish connection
+                    if (header.Type == ConnectionType.Connect) // If this endPoint wants to establish connection
                     {
                         if (length == BSUtility.PACKET_MAX_SIZE) // Make sure this message has been padded to avoid DDoS amplification
                         {
@@ -460,7 +460,7 @@ namespace BSNet
                             // Send a connection message to the sender
                             if (sendResponse && connections.ContainsKey(endPoint))
                             {
-                                byte[] bytes = SendRawMessage(connection, ConnectionType.CONNECT, connection.LocalToken, writer =>
+                                byte[] bytes = SendRawMessage(connection, ConnectionType.Connect, connection.LocalToken, writer =>
                                 {
                                     using (BSReader reader2 = BSReader.Get(readerBytes))
                                         OnRequestConnect(endPoint, reader2, writer);
@@ -479,7 +479,7 @@ namespace BSNet
                     }
                     else if (connections.TryGetValue(endPoint, out T connection))
                     {
-                        if (header.Type == ConnectionType.DISCONNECT) // If this endPoint wants to disconnect
+                        if (header.Type == ConnectionType.Disconnect) // If this endPoint wants to disconnect
                         {
                             // If this connection is authenticated
                             if (connection.Authenticated && connection.Authenticate(header.Token, ElapsedTime))
@@ -521,7 +521,7 @@ namespace BSNet
                                 }
 
                                 // Validate packet and return payload to application
-                                if (!connection.IsAcknowledged(header.Sequence) && header.Type == ConnectionType.MESSAGE)
+                                if (!connection.IsAcknowledged(header.Sequence) && header.Type == ConnectionType.Message)
                                     OnReceiveMessage(endPoint, header.Sequence, reader);
 
                                 // Acknowledge this packet

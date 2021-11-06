@@ -13,7 +13,7 @@ namespace BSNetTest
         [TestMethod]
         public void HeaderSerializeTest()
         {
-            byte type = ConnectionType.MESSAGE;
+            ConnectionType type = ConnectionType.Message;
             ushort sequence = 416;
             ushort ack = 412;
             ushort ackBits = 4214;
@@ -54,7 +54,7 @@ namespace BSNetTest
         public void HeaderPaddingChecksumTest()
         {
             byte[] version = new byte[] { 0xC0, 0xDE, 0xCA, 0xFE };
-            byte type = ConnectionType.CONNECT;
+            ConnectionType type = ConnectionType.Connect;
             ushort sequence = 416;
             ushort ack = 412;
             uint ackBits = 0b0011001100110011;
