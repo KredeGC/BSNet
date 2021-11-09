@@ -19,6 +19,8 @@ namespace BSNetTest
             BSWriter occupy1 = BSWriter.Get(4);
             BSWriter occupy2 = BSWriter.Get(4);
 
+            Assert.IsNotNull(occupy1);
+            Assert.IsNotNull(occupy2);
             Assert.AreNotSame(occupy1, occupy2);
 
             BSWriter.Return(occupy1);
@@ -37,6 +39,8 @@ namespace BSNetTest
             BSReader occupy1 = BSReader.Get(rawBytes);
             BSReader occupy2 = BSReader.Get(rawBytes);
 
+            Assert.IsNotNull(occupy1);
+            Assert.IsNotNull(occupy2);
             Assert.AreNotSame(occupy1, occupy2);
 
             BSReader.Return(occupy1);

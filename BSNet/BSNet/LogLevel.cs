@@ -6,8 +6,17 @@
     /// </summary>
     public enum LogLevel
     {
-        Info,       // Generic info messages
-        Warning,    // Warnings about potential disconnect, packet losses etc.
-        Error       // Exceptions etc.
+        /// <summary>
+        /// Unused, but can be called by child applications
+        /// </summary>
+        Info,
+        /// <summary>
+        /// Returned on general user warnings like potential disconnects, packet losses and failed checksums
+        /// </summary>
+        Warning,
+        /// <summary>
+        /// Returned on SocketException and Exception along with the stacktrace
+        /// </summary>
+        Error
     }
 }

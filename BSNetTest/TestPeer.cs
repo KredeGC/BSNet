@@ -43,7 +43,7 @@ namespace BSNetTest
         // Called when a connection has been lost with this IPEndPoint
         protected override void OnDisconnect(IPEndPoint endPoint, IBSStream reader)
         {
-            Assert.IsNotNull(reader);
+            Assert.IsNotNull(reader); // Assert no timeout occurs
         }
 
         // Unused
@@ -55,11 +55,6 @@ namespace BSNetTest
         protected override void OnReceiveMessage(IPEndPoint endPoint, ushort sequence, IBSStream reader)
         {
             Assert.Fail();
-        }
-
-        // Unused
-        protected override void OnReceiveAcknowledgement(IPEndPoint endPoint, ushort sequence)
-        {
         }
     }
 }

@@ -15,9 +15,20 @@ using System.Diagnostics;
 namespace BSNet
 {
 #if (ENABLE_MONO || ENABLE_IL2CPP)
+    /// <summary>
+    /// A connection-based UDP socket class
+    /// <para/>Derived from MonoBehaviour
+    /// </summary>
+    /// <typeparam name="TConnection">A connection class inherited from ClientConnection</typeparam>
     public class BSSocket<T> : MonoBehaviour where T : ClientConnection, new()
 #else
-    public abstract class BSSocket<T> : IDisposable where T : ClientConnection, new()
+    /// <summary>
+    /// A connection-based UDP socket class
+    /// <para/>Implements IDisposable for using statements
+    /// <para/>Must be inherited from in a non-abstract class
+    /// </summary>
+    /// <typeparam name="TConnection">A connection class inherited from ClientConnection</typeparam>
+    public abstract class BSSocket<TConnection> : IDisposable where TConnection : ClientConnection, new()
 #endif
     {
         /// <summary>
@@ -76,7 +87,7 @@ namespace BSNet
         protected int outGoingBipS;
 
         // Connections & reliable messages
-        protected readonly Dictionary<IPEndPoint, T> connections = new Dictionary<IPEndPoint, T>();
+        protected readonly Dictionary<IPEndPoint, TConnection> connections = new Dictionary<IPEndPoint, TConnection>();
         protected readonly Dictionary<ConnectionSequence, Packet> unsentMessages = new Dictionary<ConnectionSequence, Packet>();
         protected readonly List<IPEndPoint> lastTimedOut = new List<IPEndPoint>();
         protected readonly List<IPEndPoint> lastHeartBeats = new List<IPEndPoint>();
@@ -178,11 +189,11 @@ namespace BSNet
         /// <param name="endPoint">The endPoint to establish a connection with</param>
         public virtual void Connect(IPEndPoint endPoint)
         {
-            if (!connections.TryGetValue(endPoint, out T connection))
+            if (!connections.TryGetValue(endPoint, out TConnection connection))
             {
                 ulong localToken = Cryptography.GenerateToken();
 
-                connection = new T();
+                connection = new TConnection();
                 connection.Initialize(endPoint, ElapsedTime, localToken, 0);
                 connections.Add(endPoint, connection);
             }
@@ -207,7 +218,7 @@ namespace BSNet
         /// <param name="action">The method to fill the buffer with data</param>
         public virtual void Disconnect(IPEndPoint endPoint, Action<IBSStream> action = null)
         {
-            if (connections.TryGetValue(endPoint, out T connection))
+            if (connections.TryGetValue(endPoint, out TConnection connection))
             {
                 // Send an unreliable message with the generated token. We shouldn't wait around
                 SendRawMessage(connection, ConnectionType.Disconnect, connection.Token, writer => action?.Invoke(writer));
@@ -244,7 +255,7 @@ namespace BSNet
                 throw new ArgumentNullException(nameof(endPoint));
 
             // Check if authenticated
-            if (connections.TryGetValue(endPoint, out T connection) && connection.Authenticated)
+            if (connections.TryGetValue(endPoint, out TConnection connection) && connection.Authenticated)
             {
                 SendRawMessage(connection, ConnectionType.Message, connection.Token, writer => action?.Invoke(writer));
 
@@ -281,7 +292,7 @@ namespace BSNet
                 throw new ArgumentNullException(nameof(endPoint));
 
             // Check if authenticated
-            if (connections.TryGetValue(endPoint, out T connection) && connection.Authenticated)
+            if (connections.TryGetValue(endPoint, out TConnection connection) && connection.Authenticated)
             {
                 byte[] rawBytes = SendRawMessage(connection, ConnectionType.Message, connection.Token, writer => action?.Invoke(writer));
 
@@ -300,7 +311,7 @@ namespace BSNet
         /// <exception cref="System.ArgumentNullException"/>
         /// <exception cref="System.ArgumentOutOfRangeException"/>
         /// <param name="connection">The connection to send it to</param>
-        protected virtual void SendHeartbeat(T connection)
+        protected virtual void SendHeartbeat(TConnection connection)
         {
             if (connection.Authenticated)
                 SendRawMessage(connection, ConnectionType.Heartbeat, connection.Token);
@@ -316,7 +327,7 @@ namespace BSNet
         /// <param name="token">The token to send with it</param>
         /// <param name="action">The method to fill the buffer with data</param>
         /// <returns>The bytes that have been sent to the endPoint</returns>
-        protected virtual byte[] SendRawMessage(T connection, ConnectionType type, ulong token, Action<IBSStream> action = null)
+        protected virtual byte[] SendRawMessage(TConnection connection, ConnectionType type, ulong token, Action<IBSStream> action = null)
         {
             if (connection == null)
                 throw new ArgumentNullException(nameof(connection));
@@ -381,7 +392,7 @@ namespace BSNet
         /// </summary>
         /// <param name="connection">The connection of this endPoint</param>
         /// <param name="bytes">The payload of the packet</param>
-        protected virtual void AddReliableMessage(T connection, byte[] bytes)
+        protected virtual void AddReliableMessage(TConnection connection, byte[] bytes)
         {
             Packet msg = Packet.GetPacket(connection.AddressPoint, bytes, ElapsedTime);
 
@@ -409,7 +420,7 @@ namespace BSNet
             {
                 if (!reader.SerializeChecksum(ProtocolVersion))
                 {
-                    if (connections.TryGetValue(endPoint, out T connection))
+                    if (connections.TryGetValue(endPoint, out TConnection connection))
                         connection.UpdateCorruption(true);
 
                     Log($"Mismatching checksum received from {endPoint}. Possibly corrupted", LogLevel.Warning);
@@ -425,7 +436,7 @@ namespace BSNet
                         if (length == BSUtility.PACKET_MAX_SIZE) // Make sure this message has been padded to avoid DDoS amplification
                         {
                             bool sendResponse = false;
-                            if (connections.TryGetValue(endPoint, out T connection))
+                            if (connections.TryGetValue(endPoint, out TConnection connection))
                             {
                                 // Acknowledge this packet
                                 connection.Acknowledge(header.Sequence);
@@ -434,7 +445,7 @@ namespace BSNet
                             {
                                 // Add this connection to the list
                                 ulong localToken = Cryptography.GenerateToken();
-                                connection = new T();
+                                connection = new TConnection();
                                 connection.Initialize(endPoint, ElapsedTime, localToken, header.Token);
                                 connections.Add(endPoint, connection);
 
@@ -473,11 +484,11 @@ namespace BSNet
                         }
                         else
                         {
-                            if (connections.TryGetValue(endPoint, out T connection))
+                            if (connections.TryGetValue(endPoint, out TConnection connection))
                                 connection.UpdateCorruption(true);
                         }
                     }
-                    else if (connections.TryGetValue(endPoint, out T connection))
+                    else if (connections.TryGetValue(endPoint, out TConnection connection))
                     {
                         if (header.Type == ConnectionType.Disconnect) // If this endPoint wants to disconnect
                         {
@@ -634,7 +645,7 @@ namespace BSNet
             foreach (var data in resendMessages)
             {
                 IPEndPoint ep = data.Key.EndPoint;
-                if (connections.TryGetValue(ep, out T connection))
+                if (connections.TryGetValue(ep, out TConnection connection))
                 {
                     // Read the packet
                     byte[] rawBytes = unsentMessages[data.Key].Bytes;
@@ -676,7 +687,7 @@ namespace BSNet
             // Send a heartbeat if nothing has been sent this tick
             foreach (IPEndPoint ep in lastHeartBeats)
             {
-                if (connections.TryGetValue(ep, out T connection) && connection.LastSent < beatTime)
+                if (connections.TryGetValue(ep, out TConnection connection) && connection.LastSent < beatTime)
                     SendHeartbeat(connection);
             }
 

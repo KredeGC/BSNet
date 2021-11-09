@@ -11,6 +11,20 @@ namespace BSNetTest
         public TestContext TestContext { get; set; }
 
         [TestMethod]
+        public void HeaderPoolTest()
+        {
+            Header header1 = Header.GetHeader(ConnectionType.Heartbeat, ushort.MaxValue, ushort.MaxValue, uint.MaxValue, ulong.MaxValue);
+            Header header2 = Header.GetHeader(ConnectionType.Heartbeat, ushort.MaxValue, ushort.MaxValue, uint.MaxValue, ulong.MaxValue);
+
+            Assert.IsNotNull(header1);
+            Assert.IsNotNull(header2);
+            Assert.AreNotSame(header1, header2);
+            
+            Header.ReturnHeader(header1);
+            Header.ReturnHeader(header2);
+        }
+
+        [TestMethod]
         public void HeaderSerializeTest()
         {
             ConnectionType type = ConnectionType.Message;
