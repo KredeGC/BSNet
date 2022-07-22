@@ -45,6 +45,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="BSNet\Attributes\BSSerializable.cs" />
     <Compile Include="BSNet\BSSocket.cs" />
     <Compile Include="BSNet\BSUtility.cs" />
     <Compile Include="BSNet\BSPool.cs" />
@@ -72,6 +73,5 @@
   <ItemGroup>
     <None Include="App.config" />
   </ItemGroup>
-  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
