@@ -1,5 +1,4 @@
 [![License](https://img.shields.io/github/license/KredeGC/BSNet?style=flat-square)](https://github.com/KredeGC/BSNet/blob/master/LICENSE)
-[![Workflow](https://img.shields.io/github/workflow/status/KredeGC/BSNet/c-cpp.yml?style=flat-square)](https://github.com/KredeGC/CPPNet/actions/workflows/c-cpp.yml)
 # BSNet
 Lightweight UDP-based, transport layer for games.
 Mostly based on reading [Glenn Fiedler's articles](https://gafferongames.com).
